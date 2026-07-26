@@ -44,9 +44,14 @@ test('package and runtime identity are aligned to Agent Workbench', () => {
 
 test('public README identifies Agent Workbench as an independent project', () => {
   const readme = readFileSync('README.md', 'utf8')
+  const license = readFileSync('LICENSE', 'utf8')
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
   assert.match(readme, /^# Agent Workbench$/m)
   assert.match(readme, /independent project/i)
   assert.doesNotMatch(readme, /independent open-source desktop application/i)
-  assert.match(readme, /No open-source license has been selected yet/i)
+  assert.match(readme, /licensed under the \[MIT License\]\(LICENSE\)/i)
+  assert.equal(pkg.license, 'MIT')
+  assert.match(license, /^MIT License$/m)
+  assert.match(license, /Copyright \(c\) 2026 Agent Workbench contributors/)
   assert.match(readme, /not affiliated with or endorsed by Anthropic or OpenAI/i)
 })

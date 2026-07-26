@@ -18,6 +18,12 @@ The current prototype includes:
 
 Real external Agent launch is not enabled as a default release path. The Alpha validates deterministic local fixtures and explicit safety gates.
 
+## Install the Alpha
+
+Download the Windows installer and its checksum manifest from the matching release. Verify the SHA-256 value before running the installer, especially because the current Alpha installer is not code-signed.
+
+See [Installation and SHA-256 verification](docs/INSTALLATION.md) for exact PowerShell commands, startup checks, and uninstall steps.
+
 ## Safety Boundaries
 
 See [docs/SAFETY_BOUNDARY.md](docs/SAFETY_BOUNDARY.md).
@@ -54,6 +60,7 @@ npm run test:action
 npm run test:rollback
 npm run test:navigation
 npm run test:ipc-sender
+npm run test:api-boundary
 npm run test:static
 npm run test:electron
 npm run smoke
@@ -68,6 +75,9 @@ npm run dist
 
 ## Documentation
 
+- [Release notes](docs/RELEASE_NOTES.md)
+- [Installation and SHA-256 verification](docs/INSTALLATION.md)
+- [Known limitations](docs/KNOWN_LIMITATIONS.md)
 - [Public roadmap](docs/PUBLIC_ROADMAP.md)
 - [Safety boundary](docs/SAFETY_BOUNDARY.md)
 - [Environment isolation](docs/ENVIRONMENT_ISOLATION.md)
@@ -75,4 +85,4 @@ npm run dist
 
 ## License
 
-No open-source license has been selected yet. Public source visibility does not by itself grant reuse rights.
+Agent Workbench is licensed under the [MIT License](LICENSE).
