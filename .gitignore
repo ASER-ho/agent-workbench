@@ -1,0 +1,49 @@
+# ─── Sensitive / local config ───
+settings.json
+settings.*.json
+settings.local.json
+*.local.json
+.env
+.env.*
+config.json
+config.*.json
+*.backup.*
+*.bak
+
+# ─── Dependencies ───
+node_modules/
+
+# ─── Build output ───
+out/
+dist/
+build/
+.cache/
+.vite/
+coverage/
+
+# ─── Logs ───
+*.log
+test-results/
+playwright-report/
+blob-report/
+.stage-d-*/
+
+# ─── Transaction data ───
+*.jsonl
+logs/
+sessions/
+telemetry/
+projects/
+file-history/
+
+# ─── Archives ───
+*.zip
+*.7z
+*.rar
+
+# ─── Release artifacts ───
+release/
+
+# ─── OS ───
+.DS_Store
+Thumbs.db

@@ -1,0 +1,82 @@
+{
+  "name": "agent-workbench-desktop",
+  "version": "0.1.0-alpha.1",
+  "description": "Independent local desktop workbench for AI coding agents",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "postinstall": "node scripts/verify-node-pty-prebuild.mjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "smoke": "playwright test smoke.spec.ts",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/fixture-paths.test.mts",
+    "test:fs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/fs-ipc-boundary.test.mts",
+    "test:session": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/stub-session.test.mts",
+    "test:action": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/controlled-action.test.mts",
+    "test:rollback": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/model-rollback-boundary.test.mts",
+    "test:electron": "playwright test -c playwright.electron.config.ts",
+    "test:static": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/static/stage-a-safety.test.mts tests/static/stage-d-release.test.mts tests/static/private-path-scan.test.mts tests/static/brand-scan.test.mts tests/static/browser-smoke-harness.test.mts tests/static/credential-shape-scan.test.mts",
+    "test:privacy": "node scripts/private-path-scan.mjs src out",
+    "test:brand": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/static/brand-scan.test.mts",
+    "dev:renderer": "electron-vite dev --rendererOnly",
+    "test:smoke-harness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/static/browser-smoke-harness.test.mts",
+    "test:credentials": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/static/credential-shape-scan.test.mts",
+    "test:navigation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/navigation-security.test.mts",
+    "test:ipc-sender": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/trusted-ipc.test.mts",
+    "test:api-boundary": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/api-url-boundary.test.mts"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "chokidar": "^5.0.0",
+    "node-pty": "1.2.0-beta.12"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.0",
+    "vite": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.agentworkbench.desktop",
+    "productName": "Agent Workbench",
+    "npmRebuild": false,
+    "directories": {
+      "buildResources": "resources",
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/icon.ico",
+      "executableName": "Agent Workbench"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Agent Workbench",
+      "uninstallDisplayName": "Agent Workbench ${version}"
+    },
+    "artifactName": "Agent Workbench Setup ${version}.${ext}"
+  }
+}
