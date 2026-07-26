@@ -27,14 +27,14 @@ This is the first public Alpha release candidate built from the privacy-remediat
 
 ## Artifacts
 
-Binary source commit: `d29e651db01b8f854627cacc733431195cdbbd6c`
+Binary source commit: `2658c0e481c6fc5693aad31302058f5d8b2c86d6`
 
 The checksum manifest is recorded in a descendant release-materials commit and is not an input to these binaries.
 
 | File | Size | SHA-256 |
 | --- | ---: | --- |
-| `Agent Workbench Setup 0.1.0-alpha.1.exe` | 105,114,477 bytes | `31032FD7E987C9979FF7018EB3AE829393EC9318A0F3D104CBC9E52EB94B3CB5` |
-| `Agent Workbench Setup 0.1.0-alpha.1.exe.blockmap` | 109,837 bytes | `C07D4AFD1FBDB09DCFCA7C04D8DB7C0C8AAA6FBA54DEE07509B4E99619746AE2` |
+| `Agent Workbench Setup 0.1.0-alpha.1.exe` | 105,114,478 bytes | `B599931852D95F974A5C4BCF15560EECABF87714CB0B632D76B33416426F3042` |
+| `Agent Workbench Setup 0.1.0-alpha.1.exe.blockmap` | 109,829 bytes | `059EB18D110C4A80531C0C51C460E3F18F7FD4AC2D68B23CEE6F44D4FB43DA8D` |
 | `app.asar` | 4,127,855 bytes | `39CF4A49070DB19B72A4D393C53D2A59633BEFAFCAC5DA5848F93A19A43D40C9` |
 
 See [Installation and SHA-256 verification](INSTALLATION.md) and the release `SHA256SUMS.txt` manifest before running the installer.

@@ -1,6 +1,6 @@
 # Known Limitations
 
-The following limitations apply to Agent Workbench `0.1.0-alpha.1`.
+The following limitations apply to Agent Workbench `0.1.0-alpha.1` built from commit `2658c0e481c6fc5693aad31302058f5d8b2c86d6`.
 
 ## Platform and Distribution
 

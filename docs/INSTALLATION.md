@@ -2,6 +2,8 @@
 
 These instructions apply to `Agent Workbench 0.1.0-alpha.1` for Windows x64.
 
+Reviewed binary source commit: `2658c0e481c6fc5693aad31302058f5d8b2c86d6`.
+
 ## Download
 
 Download these files from the same release:
@@ -9,7 +11,7 @@ Download these files from the same release:
 - `Agent Workbench Setup 0.1.0-alpha.1.exe`
 - `SHA256SUMS.txt`
 
-The `.blockmap` file supports release tooling and is not required for a manual installation.
+The `.blockmap` file supports release tooling and is not required for a manual installation. The manifest also records the reviewed `app.asar`; it is embedded in the installed application and is not required as a separate download.
 
 ## Verify SHA-256
 
@@ -21,7 +23,7 @@ Get-FileHash -LiteralPath '.\Agent Workbench Setup 0.1.0-alpha.1.exe' -Algorithm
 
 Compare the complete 64-character hash with both `SHA256SUMS.txt` and the value in [Release Notes](RELEASE_NOTES.md). The values must match exactly. Do not run the installer if the filename, size, or hash differs.
 
-To verify every file listed in the manifest:
+To inspect the manifest and verify the installer plus an optionally downloaded blockmap:
 
 ```powershell
 Get-Content -LiteralPath '.\SHA256SUMS.txt'
