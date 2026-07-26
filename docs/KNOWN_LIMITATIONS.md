@@ -6,6 +6,7 @@ The following limitations apply to Agent Workbench `0.1.0-alpha.1`.
 
 - The reviewed release target is Windows x64. Other operating systems and architectures are not release-qualified.
 - The Alpha installer is not code-signed. Windows may display unknown-publisher or reputation warnings.
+- The npm package metadata does not yet declare an author field; the MIT notice identifies Agent Workbench contributors as the copyright holder.
 - Automatic update delivery is not included. Install upgrades manually after verifying the new release checksum.
 - Migration from older private application identities and user-data directories is not automated.
 

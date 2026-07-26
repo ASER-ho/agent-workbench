@@ -27,13 +27,15 @@ This is the first public Alpha release candidate built from the privacy-remediat
 
 ## Artifacts
 
-Binary source commit: `PENDING_CLEAN_REBUILD`
+Binary source commit: `d29e651db01b8f854627cacc733431195cdbbd6c`
+
+The checksum manifest is recorded in a descendant release-materials commit and is not an input to these binaries.
 
 | File | Size | SHA-256 |
 | --- | ---: | --- |
-| `Agent Workbench Setup 0.1.0-alpha.1.exe` | Pending | Pending clean rebuild |
-| `Agent Workbench Setup 0.1.0-alpha.1.exe.blockmap` | Pending | Pending clean rebuild |
-| `app.asar` | Pending | Pending clean rebuild |
+| `Agent Workbench Setup 0.1.0-alpha.1.exe` | 105,114,477 bytes | `31032FD7E987C9979FF7018EB3AE829393EC9318A0F3D104CBC9E52EB94B3CB5` |
+| `Agent Workbench Setup 0.1.0-alpha.1.exe.blockmap` | 109,837 bytes | `C07D4AFD1FBDB09DCFCA7C04D8DB7C0C8AAA6FBA54DEE07509B4E99619746AE2` |
+| `app.asar` | 4,127,855 bytes | `39CF4A49070DB19B72A4D393C53D2A59633BEFAFCAC5DA5848F93A19A43D40C9` |
 
 See [Installation and SHA-256 verification](INSTALLATION.md) and the release `SHA256SUMS.txt` manifest before running the installer.
 

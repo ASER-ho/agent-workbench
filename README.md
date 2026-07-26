@@ -78,6 +78,7 @@ npm run dist
 - [Release notes](docs/RELEASE_NOTES.md)
 - [Installation and SHA-256 verification](docs/INSTALLATION.md)
 - [Known limitations](docs/KNOWN_LIMITATIONS.md)
+- [Artifact checksums](SHA256SUMS.txt)
 - [Public roadmap](docs/PUBLIC_ROADMAP.md)
 - [Safety boundary](docs/SAFETY_BOUNDARY.md)
 - [Environment isolation](docs/ENVIRONMENT_ISOLATION.md)
