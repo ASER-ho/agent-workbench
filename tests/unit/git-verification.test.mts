@@ -79,6 +79,7 @@ test('Git verification reads staged, unstaged, untracked, deleted, renamed, spac
     assert.ok(result.changes.some(change => change.classification === 'outsideScope'))
     assert.equal(result.scopeCompliant, false)
     assert.match(result.diffDigest, /^[A-F0-9]{64}$/)
+    assert.equal(result.diffDigestCoverage, 'complete')
     assert.equal(JSON.stringify(result).includes('SECRET_PATCH_CONTENT'), false)
     assert.equal(JSON.stringify(result).includes(fx.root), false)
     assert.equal('rawDiff' in result, false)
@@ -101,6 +102,7 @@ test('Git verification marks safe summary truncation and sanitizes Git errors', 
     writeFileSync(join(fx.root, 'src', 'app', 'allowed.txt'), 'x'.repeat(8_000), 'utf8')
     const result = await new GitVerificationService({ gitExecutable: fx.git, diffLimitBytes: 64 }).inspect(fx.root, contract)
     assert.equal(result.truncated, true)
+    assert.equal(result.diffDigestCoverage, 'truncated-prefix')
     const fakeSecret = ['sk', 'abcdefghijklmnopqrstuvwxyz'].join('-')
     const unsafe = `fatal at ${join(fx.root, 'private.txt')} token=${fakeSecret}`
     const safe = sanitizeGitError(unsafe)

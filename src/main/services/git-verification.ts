@@ -326,6 +326,7 @@ export class GitVerificationService {
       sanitizedSummary: `Changed ${changes.length}; allowed ${allowedCount}; forbidden ${forbiddenCount}; outside scope ${outsideScopeCount}; diff truncated ${truncated ? 'yes' : 'no'}.`,
       truncated,
       diffDigest: digest,
+      diffDigestCoverage: truncated ? 'truncated-prefix' : 'complete',
       functionalVerificationPerformed: false,
       receipt
     }

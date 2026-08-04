@@ -53,6 +53,8 @@ export interface VerificationInspection {
   sanitizedSummary: string
   truncated: boolean
   diffDigest: string
+  /** 摘要覆盖语义：complete=覆盖全部被采集 Diff；truncated-prefix=仅覆盖被保留截断前缀，不代表完整仓库 Diff、不代表 untracked 内容、不代表任务候选状态摘要。 */
+  diffDigestCoverage: 'complete' | 'truncated-prefix'
   functionalVerificationPerformed: false
   receipt: PlainVerificationReceipt
 }

@@ -106,7 +106,7 @@ export function buildPlainLanguageReceipt(input: {
 }): PlainVerificationReceipt {
   const scopeProblem = input.forbiddenCount > 0 || input.outsideScopeCount > 0
   const confirmed = input.gitRead
-    ? `已读取 Git 修改状态并检查 ${input.changedCount} 个修改路径。${input.scopeCompliant ? '当前修改范围符合契约。' : `发现 ${input.forbiddenCount} 个禁止范围路径和 ${input.outsideScopeCount} 个范围外路径。`}${input.truncated ? ' Diff 摘要已截断，界面没有接收原始 Patch。' : ''}`
+    ? `已读取 Git 修改状态并检查 ${input.changedCount} 个修改路径。${input.scopeCompliant ? '当前修改范围符合契约。' : `发现 ${input.forbiddenCount} 个禁止范围路径和 ${input.outsideScopeCount} 个范围外路径。`}${input.truncated ? ' Diff 摘要已截断，只代表被保留的前缀，不代表完整仓库 Diff。' : ''}`
     : 'Git 修改尚未成功读取。'
   return {
     functionalVerificationPerformed: false,
