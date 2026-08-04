@@ -1,0 +1,38 @@
+// Deterministic single-criterion evaluation types.
+// This module must stay pure TypeScript: no time, random, network, fs, Electron,
+// Agent, or LLM access. Identical valid input must produce identical output.
+
+export type CriterionVerdict =
+  | 'VERIFIED'
+  | 'FAILED'
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'NOT_EVALUATED'
+
+export type EvidenceStatus = 'PASS' | 'FAIL' | 'UNKNOWN'
+
+export interface EvidenceItem {
+  evidenceId: string
+  criterionId: string
+  status: EvidenceStatus
+  valid: boolean
+}
+
+export interface EvaluationRequest {
+  criterionId: string
+  enabled: boolean
+  supported: boolean
+  evidence: EvidenceItem[]
+}
+
+export interface DecisionTraceCounts {
+  pass: number
+  fail: number
+  unknown: number
+}
+
+export interface EvaluationOutput {
+  verdict: CriterionVerdict
+  policyVersion: string
+  ruleId: string
+  decisionTrace: string
+}
