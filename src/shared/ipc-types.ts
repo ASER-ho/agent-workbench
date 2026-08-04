@@ -265,5 +265,11 @@ export const IPC_CHANNELS = {
   // Project Capsule (Phase 1A MVP)
   CAPSULE_LOAD: 'capsule:load',
   CAPSULE_SAVE: 'capsule:save',
-  CAPSULE_PICK_WORKSPACE: 'capsule:pickWorkspaceLabel'
+  CAPSULE_PICK_WORKSPACE: 'capsule:pickWorkspaceLabel',
+
+  // Workspace selection (Workspace Foundation)
+  WORKSPACE_STATUS: 'workspace:status',
+  WORKSPACE_CHOOSE: 'workspace:choose',
+  WORKSPACE_CLEAR: 'workspace:clear',
+  WORKSPACE_CHANGED: 'workspace:changed'
 } as const

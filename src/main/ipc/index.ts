@@ -11,6 +11,7 @@ import { registerRuntimeHandlers } from './runtime'
 import { registerCapsuleHandlers } from './capsule'
 import { registerSessionHandlers } from './session'
 import { registerActionHandlers } from './action'
+import { registerWorkspaceHandlers } from '../services/workspace-foundation/workspace-ipc'
 import { ClaudeProcessManager } from '../services/claude-process'
 import { FileSecretStore } from '../services/secret-store'
 import { setTrustedIpcWindow } from './trusted-ipc'
@@ -34,6 +35,10 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
   const sessionManager = registerSessionHandlers(() => mainWindow, {
     isActive: () => actionManager?.isExecuting() ?? false,
     dispose: () => actionManager?.dispose() ?? Promise.resolve()
+  })
+  registerWorkspaceHandlers(() => {
+    const status = sessionManager?.getSnapshot().status
+    return Boolean(status && ['starting', 'running', 'stopping'].includes(status))
   })
   actionManager = registerActionHandlers(() => sessionManager.getSnapshot())
 }

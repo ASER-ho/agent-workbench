@@ -147,6 +147,12 @@ export interface AgentWorkbenchApi {
     save: (capsule: ProjectCapsule) => Promise<CapsuleSaveResult>
     pickWorkspaceLabel: () => Promise<CapsulePickResult>
   }
+  workspaceSelection: {
+    getStatus: () => Promise<{ selected: boolean; displayName: string; displayId: string | null }>
+    choose: () => Promise<{ cancelled: boolean; rejected?: boolean; status: { selected: boolean; displayName: string; displayId: string | null } }>
+    clear: () => Promise<{ selected: boolean; displayName: string; displayId: string | null }>
+    onChanged: (callback: (status: { selected: boolean; displayName: string; displayId: string | null }) => void) => () => void
+  }
 }
 
 const api: AgentWorkbenchApi = {
@@ -261,6 +267,16 @@ const api: AgentWorkbenchApi = {
     load: () => ipcRenderer.invoke(IPC_CHANNELS.CAPSULE_LOAD),
     save: (capsule) => ipcRenderer.invoke(IPC_CHANNELS.CAPSULE_SAVE, capsule),
     pickWorkspaceLabel: () => ipcRenderer.invoke(IPC_CHANNELS.CAPSULE_PICK_WORKSPACE)
+  },
+  workspaceSelection: {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_STATUS),
+    choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
+    clear: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CLEAR),
+    onChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: { selected: boolean; displayName: string; displayId: string | null }) => callback(status)
+      ipcRenderer.on(IPC_CHANNELS.WORKSPACE_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_CHANGED, handler)
+    }
   }
 }
 

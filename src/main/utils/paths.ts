@@ -34,6 +34,7 @@ export interface DisplayPath {
 type ConfiguredWorkspacePaths = Required<WorkspacePathOverrides>
 
 let configuredRuntimePaths: ConfiguredWorkspacePaths | undefined
+let selectedWorkspaceExplicitly = false
 
 function normalizeAbsolutePath(value: string | undefined, label: string): string {
   const candidate = value?.trim()
@@ -65,6 +66,11 @@ export function setSelectedWorkspaceRoot(workspaceRoot: string): void {
     ...configuredRuntimePaths,
     workspaceRoot: normalizeAbsolutePath(workspaceRoot, 'workspaceRoot')
   }
+  selectedWorkspaceExplicitly = true
+}
+
+export function hasExplicitWorkspaceSelection(): boolean {
+  return selectedWorkspaceExplicitly || process.env['AGENT_WORKBENCH_E2E'] === '1'
 }
 
 function getE2EPathOverrides(): ConfiguredWorkspacePaths | undefined {
