@@ -27,7 +27,8 @@
     "test:navigation": "node --experimental-strip-types --no-warnings --test tests/unit/navigation-security.test.mts",
     "test:ipc-sender": "node --experimental-strip-types --no-warnings --test tests/unit/trusted-ipc.test.mts",
     "test:api-boundary": "node --experimental-strip-types --no-warnings --test tests/unit/api-url-boundary.test.mts",
-    "test:verification": "node --experimental-strip-types --no-warnings --test tests/unit/verification-contract.test.mts tests/unit/git-verification.test.mts tests/unit/inspection-guard.test.mts tests/unit/workspace-foundation.test.mts"
+    "test:verification": "node --experimental-strip-types --no-warnings --test tests/unit/verification-contract.test.mts tests/unit/git-verification.test.mts tests/unit/inspection-guard.test.mts tests/unit/workspace-foundation.test.mts",
+    "test:criterion": "node --experimental-strip-types --no-warnings --test tests/unit/criterion-evaluator.test.mts"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
