@@ -30,9 +30,10 @@ export interface DecisionTraceCounts {
   unknown: number
 }
 
-export interface EvaluationOutput {
+export interface CriterionEvaluationResult {
+  criterionId: string
   verdict: CriterionVerdict
-  policyVersion: string
+  policyVersion: 'r2b1-v1'
   ruleId: string
-  decisionTrace: string
+  decisionTrace: string[]
 }

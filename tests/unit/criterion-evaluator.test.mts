@@ -109,7 +109,12 @@ test('evidence order does not change the output', () => {
       { evidenceId: 'e2', criterionId: 'C-001', status: 'UNKNOWN', valid: true }
     ]
   })
-  assert.deepEqual(evaluateCriterion(a), evaluateCriterion(b))
+  const resultA = evaluateCriterion(a)
+  const resultB = evaluateCriterion(b)
+  assert.equal(resultA.criterionId, 'C-001')
+  assert.equal(resultB.criterionId, 'C-001')
+  // 输入证据顺序变化时，完整结果（含 criterionId 与 decisionTrace 数组）仍 deepEqual
+  assert.deepEqual(resultA, resultB)
 })
 
 test('repeated execution produces deep-equal output', () => {
@@ -131,11 +136,13 @@ test('decisionTrace contains the matched rule and stable normalized evidence', (
       { evidenceId: 'e1', criterionId: 'C-001', status: 'PASS', valid: true }
     ]
   }))
-  assert.match(out.decisionTrace, /policy:r2b1-v1/)
-  assert.match(out.decisionTrace, /criterion:C-001/)
-  assert.match(out.decisionTrace, /rule:EVAL_V1_PASS_WITHOUT_FAIL/)
-  assert.match(out.decisionTrace, /verdict:VERIFIED/)
-  assert.match(out.decisionTrace, /valid-evidence:pass=1,fail=0,unknown=1/)
+  const trace = out.decisionTrace.join('\n')
+  assert.match(trace, /policy:r2b1-v1/)
+  assert.match(trace, /criterion:C-001/)
+  assert.match(trace, /rule:EVAL_V1_PASS_WITHOUT_FAIL/)
+  assert.match(trace, /verdict:VERIFIED/)
+  assert.match(trace, /valid-evidence:pass=1,fail=0,unknown=1/)
+  assert.equal(out.criterionId, 'C-001')
 })
 
 test('output contains no Acceptance Decision', () => {
