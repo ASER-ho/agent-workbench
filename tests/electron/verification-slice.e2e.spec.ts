@@ -12,6 +12,42 @@ let page: Page
 let root = ''
 let git = ''
 
+// F5: 在主进程挂 ipcMain 记录器，监听 session/terminal/action 通道。
+// contextBridge 暴露的 window.api 为只读，无法在 renderer 侧 stub；改为主进程侧监控真实 IPC 到达。
+async function installIpcRecorder(): Promise<void> {
+  if (!app) throw new Error('app not launched')
+  const installed = await app.evaluate(async ({ ipcMain }) => {
+    if ((globalThis as any).__awIpcRecorderInstalled) return true
+    const recorded: string[] = []
+    const channels = [
+      'session:readiness', 'session:prepare', 'session:start', 'session:input', 'session:stop',
+      'session:get-status', 'session:get-receipt',
+      'terminal:start', 'terminal:stop', 'terminal:write', 'terminal:resize',
+      'action:propose', 'action:approve', 'action:reject', 'action:cancel', 'action:execute', 'action:get-receipts'
+    ]
+    for (const ch of channels) {
+      ipcMain.on(ch, () => { recorded.push(ch) })
+    }
+    ;(globalThis as any).__awIpcRecorded = recorded
+    ;(globalThis as any).__awIpcRecorderInstalled = true
+    return true
+  })
+  if (!installed) throw new Error('F5 IPC recorder could not be installed')
+}
+
+async function clearIpcRecorder(): Promise<void> {
+  if (!app) return
+  await app.evaluate(() => { (globalThis as any).__awIpcRecorded.length = 0 })
+}
+
+async function readIpcRecordings(): Promise<string[]> {
+  if (!app) return []
+  return app.evaluate(() => {
+    if (!(globalThis as any).__awIpcRecorderInstalled) throw new Error('F5 IPC recorder not installed')
+    return [...(globalThis as any).__awIpcRecorded]
+  })
+}
+
 function findGit(): string {
   const resolved = resolveWhereGitExecutable()
   if (!resolved) throw new Error('E2E requires a trusted git.exe')
@@ -54,6 +90,7 @@ test.beforeEach(async () => {
   })
   page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  await installIpcRecorder()
 })
 
 test.afterEach(async () => {
@@ -73,12 +110,8 @@ test('Welcome verification flow classifies allowed then outside-scope changes wi
   await verification.getByLabel('验收标准').fill('所有改动路径都被分类')
   await verification.getByLabel('已知风险').fill('尚未运行验证命令')
 
-  await page.evaluate(() => {
-    const api = (window as any).api
-    for (const name of ['prepare', 'start', 'input', 'stop']) {
-      api.session[name] = () => Promise.reject(new Error(`verification must not call session.${name}`))
-    }
-  })
+  // F5: 清空启动期记录，再执行 verification 流程
+  await clearIpcRecorder()
 
   await verification.getByRole('button', { name: '检查当前修改' }).click()
   await expect(verification.getByText('范围检查：合规')).toBeVisible()
@@ -98,6 +131,11 @@ test('Welcome verification flow classifies allowed then outside-scope changes wi
   await expect(verification.getByText('范围检查：发现范围外修改')).toBeVisible()
   await expect(verification.getByText('docs/outside.txt')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
+
+  // F5: verification 流程期间不得触发 Session/Terminal/Action IPC
+  const recorded = await readIpcRecordings()
+  expect(recorded.filter(ch => ch.startsWith('session:') || ch.startsWith('terminal:') || ch.startsWith('action:'))).toEqual([])
+
   await page.screenshot({ path: testInfo.outputPath('verification-result.png'), fullPage: true })
 })
 
