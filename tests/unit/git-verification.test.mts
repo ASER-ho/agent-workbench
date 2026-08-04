@@ -129,3 +129,18 @@ test('decodeWhereOutputCandidates yields nothing for bytes invalid in both stric
   const bad = Buffer.from([0xf0])
   assert.deepEqual(decodeWhereOutputCandidates(bad), [])
 })
+
+test('Git verification expresses staged and unstaged states on the same file', async () => {
+  const fx = fixture()
+  try {
+    writeFileSync(join(fx.root, 'src', 'app', 'both.txt'), 'v1\n', 'utf8')
+    runGit(fx.git, fx.root, ['add', 'src/app/both.txt'])
+    writeFileSync(join(fx.root, 'src', 'app', 'both.txt'), 'v2\n', 'utf8')
+
+    const result = await new GitVerificationService({ gitExecutable: fx.git }).inspect(fx.root, contract)
+    const both = result.changes.find(change => change.path === 'src/app/both.txt')
+    assert.ok(both, 'both.txt change present')
+    assert.ok(both.states.includes('staged'), `states includes staged: ${both.states}`)
+    assert.ok(both.states.includes('unstaged'), `states includes unstaged: ${both.states}`)
+  } finally { fx.cleanup() }
+})
