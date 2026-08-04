@@ -7,6 +7,8 @@ import type { EvaluationRequest } from '../../src/shared/evaluation-types.ts'
 const POLICY = 'r2b1-v1'
 const POLICY_DIGEST = 'policy-digest-a'
 const SUBJECT_DIGEST = 'subject-digest-a'
+const AS_OF = '2026-08-04T10:00:00.000Z'
+const FRESHNESS_POLICY = { policyId: 'evidence-freshness-v1', maxAgeMs: 86_400_000 } as const
 
 function request(overrides: Partial<EvaluationRequest> = {}): EvaluationRequest {
   return {
@@ -15,6 +17,8 @@ function request(overrides: Partial<EvaluationRequest> = {}): EvaluationRequest 
     supported: true,
     policyDigest: POLICY_DIGEST,
     subjectDigest: SUBJECT_DIGEST,
+    evaluationAsOf: AS_OF,
+    freshnessPolicy: FRESHNESS_POLICY,
     evidence: [],
     ...overrides
   }
@@ -28,6 +32,7 @@ function ev(evidenceId: string, status: 'PASS' | 'FAIL' | 'UNKNOWN', extra: Part
     valid: true,
     policyDigest: POLICY_DIGEST,
     subjectDigest: SUBJECT_DIGEST,
+    observedAt: AS_OF,
     ...extra
   }
 }

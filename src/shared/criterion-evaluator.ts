@@ -3,6 +3,7 @@
 // No time, random, network, fs, Electron, Agent, or LLM access.
 import type { CriterionEvaluationResult, EvidenceItem, EvaluationRequest } from './evaluation-types.ts'
 import { EVALUATION_POLICY_VERSION, evaluateByPolicyV1 } from './evaluation-policy-v1.ts'
+import { classifyFreshness, FRESHNESS_RULES, isEvidenceFreshnessPolicy, isValidIsoTimestamp } from './evidence-freshness-policy-v1.ts'
 
 /**
  * Normalize evidence deterministically with fail-closed digest binding.
@@ -53,12 +54,15 @@ export function buildDecisionTrace(params: {
   failCount: number
   unknownCount: number
   excluded: number
+  freshnessExclusions?: { invalid: number; future: number; stale: number }
 }): string[] {
+  const f = params.freshnessExclusions ?? { invalid: 0, future: 0, stale: 0 }
   return [
     `policy:${EVALUATION_POLICY_VERSION}`,
     `criterion:${params.criterionId}`,
     `valid-evidence:pass=${params.passCount},fail=${params.failCount},unknown=${params.unknownCount}`,
     `excluded:${params.excluded}`,
+    `freshness-excluded:invalid=${f.invalid},future=${f.future},stale=${f.stale}`,
     `rule:${params.ruleId}`,
     `verdict:${params.verdict}`
   ]
@@ -82,8 +86,57 @@ function notEvaluatedResult(request: EvaluationRequest, ruleId: string): Criteri
   }
 }
 
+function insufficientResult(request: EvaluationRequest, ruleId: string, excluded: number): CriterionEvaluationResult {
+  return {
+    criterionId: request.criterionId,
+    verdict: 'INSUFFICIENT_EVIDENCE',
+    policyVersion: 'r2b1-v1',
+    ruleId,
+    decisionTrace: buildDecisionTrace({
+      criterionId: request.criterionId,
+      ruleId,
+      verdict: 'INSUFFICIENT_EVIDENCE',
+      passCount: 0,
+      failCount: 0,
+      unknownCount: 0,
+      excluded
+    })
+  }
+}
+
+/**
+ * Apply the evidence freshness policy to the digest-matched candidates. Evidence
+ * whose freshness metadata is unusable, that is observed after the evaluation
+ * time, or that is older than maxAgeMs is excluded. The retained items and the
+ * per-reason exclusion counts are returned; the evaluator never reads the current
+ * time and only consumes the explicit evaluationAsOf.
+ */
+function filterByFreshness(
+  evidence: EvidenceItem[],
+  evaluationAsOf: string,
+  maxAgeMs: number
+): { fresh: EvidenceItem[]; excluded: { invalid: number; future: number; stale: number } } {
+  const excluded = { invalid: 0, future: 0, stale: 0 }
+  const fresh: EvidenceItem[] = []
+  for (const item of evidence) {
+    const reason = classifyFreshness({ observedAt: item.observedAt, evaluationAsOf, maxAgeMs })
+    if (reason === null) {
+      fresh.push(item)
+    } else if (reason === 'INVALID_FRESHNESS_METADATA') {
+      excluded.invalid += 1
+    } else if (reason === 'FUTURE_EVIDENCE') {
+      excluded.future += 1
+    } else {
+      excluded.stale += 1
+    }
+  }
+  return { fresh, excluded }
+}
+
 export function evaluateCriterion(request: EvaluationRequest): CriterionEvaluationResult {
-  // Rule order: disabled/unsupported first (frozen policy), then fail-closed binding.
+  // Rule order (fixed): enabled/supported (frozen policy), then fail-closed
+  // binding, then fail-closed freshness, then digest matching, then per-evidence
+  // freshness, then the R2B1 FAIL/PASS/insufficient verdict.
   if (!request.enabled) {
     return notEvaluatedResult(request, 'EVAL_V1_DISABLED')
   }
@@ -93,27 +146,26 @@ export function evaluateCriterion(request: EvaluationRequest): CriterionEvaluati
   if (!hasCompleteBinding(request)) {
     // Fail-closed: without both digests the binding cannot be established, so no
     // evidence can participate and no PASS/FAIL verdict may be produced.
-    return {
-      criterionId: request.criterionId,
-      verdict: 'INSUFFICIENT_EVIDENCE',
-      policyVersion: 'r2b1-v1',
-      ruleId: 'EVAL_V1_NO_VALID_EVIDENCE',
-      decisionTrace: buildDecisionTrace({
-        criterionId: request.criterionId,
-        ruleId: 'EVAL_V1_NO_VALID_EVIDENCE',
-        verdict: 'INSUFFICIENT_EVIDENCE',
-        passCount: 0,
-        failCount: 0,
-        unknownCount: 0,
-        excluded: request.evidence.length
-      })
-    }
+    return insufficientResult(request, 'EVAL_V1_NO_VALID_EVIDENCE', request.evidence.length)
+  }
+  if (request.evaluationAsOf === undefined || !isValidIsoTimestamp(request.evaluationAsOf)) {
+    // Fail-closed: without a valid evaluation time no evidence can be judged fresh.
+    return insufficientResult(request, FRESHNESS_RULES.NO_EVALUATION_TIME, request.evidence.length)
+  }
+  if (!isEvidenceFreshnessPolicy(request.freshnessPolicy)) {
+    // Fail-closed: without a usable freshness policy no evidence can pass.
+    return insufficientResult(request, FRESHNESS_RULES.NO_FRESHNESS_POLICY, request.evidence.length)
   }
   const { retained, excluded } = normalizeEvidence(request.criterionId, request.evidence, {
     policyDigest: request.policyDigest as string,
     subjectDigest: request.subjectDigest as string
   })
-  const statuses = retained.map(item => item.status)
+  const { fresh, excluded: freshnessExcluded } = filterByFreshness(
+    retained,
+    request.evaluationAsOf,
+    request.freshnessPolicy.maxAgeMs
+  )
+  const statuses = fresh.map(item => item.status)
   const policyResult = evaluateByPolicyV1({
     enabled: request.enabled,
     supported: request.supported,
@@ -126,7 +178,8 @@ export function evaluateCriterion(request: EvaluationRequest): CriterionEvaluati
     passCount: policyResult.passCount,
     failCount: policyResult.failCount,
     unknownCount: policyResult.unknownCount,
-    excluded
+    excluded,
+    freshnessExclusions: freshnessExcluded
   })
   return {
     criterionId: request.criterionId,

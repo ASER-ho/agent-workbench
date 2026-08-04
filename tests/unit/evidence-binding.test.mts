@@ -28,6 +28,9 @@ function subjectWith(content: Partial<SubjectSnapshot> = {}): SubjectSnapshot {
   return { ...SUBJECT, ...content }
 }
 
+const AS_OF = '2026-08-04T10:00:00.000Z'
+const FRESHNESS_POLICY = { policyId: 'evidence-freshness-v1', maxAgeMs: 86_400_000 } as const
+
 function request(overrides: Partial<EvaluationRequest> = {}): EvaluationRequest {
   return {
     criterionId: 'C-001',
@@ -35,6 +38,8 @@ function request(overrides: Partial<EvaluationRequest> = {}): EvaluationRequest 
     supported: true,
     policyDigest: DEFAULT_POLICY_DIGEST,
     subjectDigest: DEFAULT_SUBJECT_DIGEST,
+    evaluationAsOf: AS_OF,
+    freshnessPolicy: FRESHNESS_POLICY,
     evidence: [],
     ...overrides
   }
@@ -48,6 +53,7 @@ function ev(evidenceId: string, status: 'PASS' | 'FAIL' | 'UNKNOWN', extra: Part
     valid: true,
     policyDigest: DEFAULT_POLICY_DIGEST,
     subjectDigest: DEFAULT_SUBJECT_DIGEST,
+    observedAt: AS_OF,
     ...extra
   }
 }

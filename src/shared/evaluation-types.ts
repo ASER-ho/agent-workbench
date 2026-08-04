@@ -17,6 +17,12 @@ export interface EvidenceItem {
   valid: boolean
   policyDigest?: string
   subjectDigest?: string
+  observedAt?: string
+}
+
+export interface EvidenceFreshnessPolicy {
+  policyId: 'evidence-freshness-v1'
+  maxAgeMs: number
 }
 
 export interface EvaluationRequest {
@@ -25,6 +31,8 @@ export interface EvaluationRequest {
   supported: boolean
   policyDigest?: string
   subjectDigest?: string
+  evaluationAsOf?: string
+  freshnessPolicy?: EvidenceFreshnessPolicy
   evidence: EvidenceItem[]
 }
 
