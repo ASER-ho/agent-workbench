@@ -26,7 +26,8 @@
     "test:credentials": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/static/credential-shape-scan.test.mts",
     "test:navigation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/navigation-security.test.mts",
     "test:ipc-sender": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/trusted-ipc.test.mts",
-    "test:api-boundary": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/api-url-boundary.test.mts"
+    "test:api-boundary": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/unit/api-url-boundary.test.mts",
+    "test:verification": "node --experimental-strip-types --no-warnings --test tests/unit/verification-contract.test.mts tests/unit/git-verification.test.mts tests/unit/inspection-guard.test.mts tests/unit/workspace-foundation.test.mts"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

@@ -6,6 +6,7 @@ import ProjectCapsule from '../editors/ProjectCapsule'
 import ReadyCheckPanel from '../editors/ReadyCheckPanel'
 import LaunchConfirmation from '../editors/LaunchConfirmation'
 import SmokeCheckPanel from '../editors/SmokeCheckPanel'
+import VerificationWorkbench from '../editors/VerificationWorkbench'
 
 const CARD_KEYS = [
   { section: 'Memory', icon: '📝', titleKey: 'welcome.memory', descKey: 'welcome.memoryDesc', fileType: 'memory' as const },
@@ -52,6 +53,11 @@ export default function WelcomeTab() {
       <p className="text-sm text-gray-600 text-center max-w-md">
         {t('welcome.subtitle')}
       </p>
+
+      {/* Read-only verification slice */}
+      <div className="w-full max-w-2xl">
+        <VerificationWorkbench />
+      </div>
 
       {/* Project Capsule card */}
       <div className="w-full max-w-lg">

@@ -6,6 +6,7 @@ import type { SessionLaunchPlan, SessionReadiness, SessionSnapshot } from '../sh
 import type {
   ActionApproval, ActionBinding, ActionExecutionResult, ActionProposal, ActionType, WorkReceipt
 } from '../shared/action-types'
+import type { VerificationContract, VerificationInspection } from '../shared/verification-types'
 
 interface CapsuleLoadResult {
   capsule: ProjectCapsule
@@ -153,6 +154,9 @@ export interface AgentWorkbenchApi {
     clear: () => Promise<{ selected: boolean; displayName: string; displayId: string | null }>
     onChanged: (callback: (status: { selected: boolean; displayName: string; displayId: string | null }) => void) => () => void
   }
+  verification: {
+    inspect: (contract: VerificationContract) => Promise<VerificationInspection>
+  }
 }
 
 const api: AgentWorkbenchApi = {
@@ -277,6 +281,9 @@ const api: AgentWorkbenchApi = {
       ipcRenderer.on(IPC_CHANNELS.WORKSPACE_CHANGED, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_CHANGED, handler)
     }
+  },
+  verification: {
+    inspect: (contract) => ipcRenderer.invoke(IPC_CHANNELS.VERIFICATION_INSPECT, { contract })
   }
 }
 

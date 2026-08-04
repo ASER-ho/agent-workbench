@@ -271,5 +271,6 @@ export const IPC_CHANNELS = {
   WORKSPACE_STATUS: 'workspace:status',
   WORKSPACE_CHOOSE: 'workspace:choose',
   WORKSPACE_CLEAR: 'workspace:clear',
-  WORKSPACE_CHANGED: 'workspace:changed'
+  WORKSPACE_CHANGED: 'workspace:changed',
+  VERIFICATION_INSPECT: 'verification:inspect'
 } as const
