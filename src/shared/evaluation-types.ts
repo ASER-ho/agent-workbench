@@ -15,13 +15,28 @@ export interface EvidenceItem {
   criterionId: string
   status: EvidenceStatus
   valid: boolean
+  policyDigest?: string
+  subjectDigest?: string
 }
 
 export interface EvaluationRequest {
   criterionId: string
   enabled: boolean
   supported: boolean
+  policyDigest?: string
+  subjectDigest?: string
   evidence: EvidenceItem[]
+}
+
+export interface PolicyDescriptor {
+  policyVersion: string
+  evaluatorRuleSet: string[]
+  policyDigest: string
+}
+
+export interface SubjectSnapshot {
+  subjectId: string
+  subjectDigest: string
 }
 
 export interface DecisionTraceCounts {

@@ -8,13 +8,26 @@ import { EVALUATION_POLICY_VERSION, evaluateByPolicyV1 } from './evaluation-poli
  * Normalize evidence deterministically:
  * - keep only valid=true items;
  * - keep only items whose criterionId matches the target criterion;
+ * - keep only items whose policyDigest and subjectDigest match the request
+ *   (when the request declares digests; evidence missing a declared digest is excluded);
  * - sort by evidenceId (string compare) so input array order never affects output.
+ * Returns the retained items; the count of excluded items is reported separately.
  */
-export function normalizeEvidence(criterionId: string, evidence: EvidenceItem[]): EvidenceItem[] {
-  return evidence
-    .filter(item => item.valid === true && item.criterionId === criterionId)
+export function normalizeEvidence(
+  criterionId: string,
+  evidence: EvidenceItem[],
+  digests: { policyDigest?: string; subjectDigest?: string }
+): { retained: EvidenceItem[]; excluded: number } {
+  const retained = evidence
+    .filter(item =>
+      item.valid === true &&
+      item.criterionId === criterionId &&
+      (digests.policyDigest === undefined || item.policyDigest === digests.policyDigest) &&
+      (digests.subjectDigest === undefined || item.subjectDigest === digests.subjectDigest)
+    )
     .slice()
     .sort((a, b) => (a.evidenceId < b.evidenceId ? -1 : a.evidenceId > b.evidenceId ? 1 : 0))
+  return { retained, excluded: evidence.length - retained.length }
 }
 
 /**
@@ -29,19 +42,24 @@ export function buildDecisionTrace(params: {
   passCount: number
   failCount: number
   unknownCount: number
+  excluded: number
 }): string[] {
   return [
     `policy:${EVALUATION_POLICY_VERSION}`,
     `criterion:${params.criterionId}`,
     `valid-evidence:pass=${params.passCount},fail=${params.failCount},unknown=${params.unknownCount}`,
+    `excluded:${params.excluded}`,
     `rule:${params.ruleId}`,
     `verdict:${params.verdict}`
   ]
 }
 
 export function evaluateCriterion(request: EvaluationRequest): CriterionEvaluationResult {
-  const normalized = normalizeEvidence(request.criterionId, request.evidence)
-  const statuses = normalized.map(item => item.status)
+  const { retained, excluded } = normalizeEvidence(request.criterionId, request.evidence, {
+    policyDigest: request.policyDigest,
+    subjectDigest: request.subjectDigest
+  })
+  const statuses = retained.map(item => item.status)
   const policyResult = evaluateByPolicyV1({
     enabled: request.enabled,
     supported: request.supported,
@@ -53,7 +71,8 @@ export function evaluateCriterion(request: EvaluationRequest): CriterionEvaluati
     verdict: policyResult.verdict,
     passCount: policyResult.passCount,
     failCount: policyResult.failCount,
-    unknownCount: policyResult.unknownCount
+    unknownCount: policyResult.unknownCount,
+    excluded
   })
   return {
     criterionId: request.criterionId,
