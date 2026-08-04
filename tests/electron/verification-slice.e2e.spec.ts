@@ -86,6 +86,12 @@ test('Welcome verification flow classifies allowed then outside-scope changes wi
   await expect(verification.getByText('只检查 Git 修改范围；尚未运行功能验证命令。', { exact: true })).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
 
+  // F4: 修改允许路径后旧结果立即消失
+  await verification.getByLabel('允许路径').fill('docs')
+  await expect(verification.getByText('范围检查：合规')).not.toBeVisible()
+  // 恢复允许路径，保持后续流程语义不变
+  await verification.getByLabel('允许路径').fill('src')
+
   const workspace = join(root, 'workspace')
   writeFileSync(join(workspace, 'docs', 'outside.txt'), 'outside change\n', 'utf8')
   await verification.getByRole('button', { name: '检查当前修改' }).click()
@@ -94,3 +100,10 @@ test('Welcome verification flow classifies allowed then outside-scope changes wi
   await expect(page.locator('body')).not.toContainText(root)
   await page.screenshot({ path: testInfo.outputPath('verification-result.png'), fullPage: true })
 })
+
+// 注：F3/F4 的其余场景（请求进行中修改 Contract 丢弃旧响应、workspace A/B 竞态、
+// getStatus 失败清除旧结果、onChanged 可解除订阅）由单元测试
+// `tests/unit/inspection-guard.test.mts` 覆盖。原因：contextBridge 暴露的 `window.api`
+// 成员为只读（writable=false, configurable=false），E2E 无法 stub
+// `api.verification.inspect` 或 `api.workspaceSelection.getStatus` 以构造可控时序；
+// 因此这些状态判别逻辑被抽为纯函数模块并在单元测试中验证。

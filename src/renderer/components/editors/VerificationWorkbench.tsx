@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VerificationContract, VerificationInspection } from '../../../shared/verification-types'
 import { useLocale } from '../../contexts/LocaleContext'
+import { createInspectionGuard, sameWorkspace } from './inspection-guard'
 
 type WorkspaceStatus = Awaited<ReturnType<typeof window.api.workspaceSelection.getStatus>>
 
@@ -28,14 +29,56 @@ export default function VerificationWorkbench() {
   const [result, setResult] = useState<VerificationInspection | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const guardRef = useRef(createInspectionGuard())
+  // 工作区身份以 ref 跟踪，比较在 updater 之外进行，避免 updater 内部副作用
+  const workspaceRef = useRef<WorkspaceStatus | null>(null)
+
+  const invalidate = useCallback(() => {
+    guardRef.current.invalidate()
+    setResult(null)
+    setBusy(false)
+  }, [])
+
+  const setContractField = useCallback(<K extends keyof VerificationContract>(key: K, value: VerificationContract[K]) => {
+    invalidate()
+    setContract(current => ({ ...current, [key]: value }))
+  }, [invalidate])
+
+  const applyWorkspace = useCallback((status: WorkspaceStatus) => {
+    if (!sameWorkspace(workspaceRef.current, status)) invalidate()
+    workspaceRef.current = status
+    setWorkspace(status)
+  }, [invalidate])
 
   useEffect(() => {
     let active = true
-    window.api.workspaceSelection.getStatus()
-      .then(status => { if (active) setWorkspace(status) })
-      .catch(() => { if (active) setWorkspace(null) })
-    return () => { active = false }
-  }, [])
+    const refresh = async () => {
+      try {
+        const status = await window.api.workspaceSelection.getStatus()
+        if (!active) return
+        applyWorkspace(status)
+      } catch {
+        if (!active) return
+        invalidate()
+        setWorkspace(null)
+      }
+    }
+    void refresh()
+    const unsubscribe = window.api.workspaceSelection.onChanged(status => {
+      if (!active) return
+      applyWorkspace(status)
+    })
+    const onFocus = () => { void refresh() }
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      active = false
+      unsubscribe()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [applyWorkspace, invalidate])
 
   const ready = useMemo(() => Boolean(
     workspace?.selected && contract.title.trim() && contract.goal.trim() &&
@@ -44,14 +87,12 @@ export default function VerificationWorkbench() {
 
   const chooseWorkspace = async () => {
     setError('')
-    setResult(null)
     setBusy(true)
     try {
       const response = await window.api.workspaceSelection.choose()
-      setWorkspace(response.status)
+      if (response.status.selected) applyWorkspace(response.status)
     } catch {
       setError(t('verification.workspaceFailed'))
-    } finally {
       setBusy(false)
     }
   }
@@ -59,14 +100,33 @@ export default function VerificationWorkbench() {
   const inspect = async () => {
     if (!ready) return
     setError('')
-    setResult(null)
+    let freshWorkspace: WorkspaceStatus | null = null
+    try {
+      freshWorkspace = await window.api.workspaceSelection.getStatus()
+    } catch {
+      invalidate()
+      setError(t('verification.workspaceFailed'))
+      return
+    }
+    if (!freshWorkspace?.selected || freshWorkspace.displayId !== workspaceRef.current?.displayId) {
+      applyWorkspace(freshWorkspace)
+      setError(t('verification.workspaceFailed'))
+      return
+    }
+    const requestId = guardRef.current.begin()
     setBusy(true)
     try {
-      setResult(await window.api.verification.inspect(contract))
+      const next = await window.api.verification.inspect(contract)
+      if (!guardRef.current.shouldAccept(requestId)) return
+      setResult(next)
     } catch {
-      setError(t('verification.inspectFailed'))
+      if (guardRef.current.shouldAccept(requestId)) {
+        setError(t('verification.inspectFailed'))
+      }
     } finally {
-      setBusy(false)
+      if (guardRef.current.shouldAccept(requestId)) {
+        setBusy(false)
+      }
     }
   }
 
@@ -97,29 +157,29 @@ export default function VerificationWorkbench() {
       <div className="grid gap-3">
         <label className="grid gap-1 text-xs text-gray-500">
           {t('verification.taskTitle')}
-          <input className={fieldClass} value={contract.title} onChange={event => setContract(current => ({ ...current, title: event.target.value }))} />
+          <input className={fieldClass} value={contract.title} onChange={event => setContractField('title', event.target.value)} />
         </label>
         <label className="grid gap-1 text-xs text-gray-500">
           {t('verification.goal')}
-          <textarea className={fieldClass} rows={2} value={contract.goal} onChange={event => setContract(current => ({ ...current, goal: event.target.value }))} />
+          <textarea className={fieldClass} rows={2} value={contract.goal} onChange={event => setContractField('goal', event.target.value)} />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 text-xs text-gray-500">
             {t('verification.allowedPaths')}
-            <textarea className={fieldClass} rows={3} value={lineValue(contract.allowedPaths)} onChange={event => setContract(current => ({ ...current, allowedPaths: lines(event.target.value) }))} />
+            <textarea className={fieldClass} rows={3} value={lineValue(contract.allowedPaths)} onChange={event => setContractField('allowedPaths', lines(event.target.value))} />
           </label>
           <label className="grid gap-1 text-xs text-gray-500">
             {t('verification.forbiddenPaths')}
-            <textarea className={fieldClass} rows={3} value={lineValue(contract.forbiddenPaths)} onChange={event => setContract(current => ({ ...current, forbiddenPaths: lines(event.target.value) }))} />
+            <textarea className={fieldClass} rows={3} value={lineValue(contract.forbiddenPaths)} onChange={event => setContractField('forbiddenPaths', lines(event.target.value))} />
           </label>
         </div>
         <label className="grid gap-1 text-xs text-gray-500">
           {t('verification.acceptanceCriteria')}
-          <textarea className={fieldClass} rows={2} value={lineValue(contract.acceptanceCriteria)} onChange={event => setContract(current => ({ ...current, acceptanceCriteria: lines(event.target.value) }))} />
+          <textarea className={fieldClass} rows={2} value={lineValue(contract.acceptanceCriteria)} onChange={event => setContractField('acceptanceCriteria', lines(event.target.value))} />
         </label>
         <label className="grid gap-1 text-xs text-gray-500">
           {t('verification.knownRisks')}
-          <textarea className={fieldClass} rows={2} value={lineValue(contract.knownRisks)} onChange={event => setContract(current => ({ ...current, knownRisks: lines(event.target.value) }))} />
+          <textarea className={fieldClass} rows={2} value={lineValue(contract.knownRisks)} onChange={event => setContractField('knownRisks', lines(event.target.value))} />
         </label>
       </div>
 
