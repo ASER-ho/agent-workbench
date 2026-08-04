@@ -7,6 +7,12 @@ import type {
   ActionApproval, ActionBinding, ActionExecutionResult, ActionProposal, ActionType, WorkReceipt
 } from '../shared/action-types'
 import type { VerificationContract, VerificationInspection } from '../shared/verification-types'
+import type {
+  ControlledVerificationCancelResult,
+  ControlledVerificationPreview,
+  ControlledVerificationPreviewRequest,
+  ControlledVerificationResult
+} from '../shared/controlled-verification-execution-types'
 
 interface CapsuleLoadResult {
   capsule: ProjectCapsule
@@ -157,6 +163,11 @@ export interface AgentWorkbenchApi {
   verification: {
     inspect: (contract: VerificationContract) => Promise<VerificationInspection>
   }
+  controlledVerification: {
+    preview: (req: ControlledVerificationPreviewRequest) => Promise<ControlledVerificationPreview>
+    confirm: (confirmationId: string) => Promise<ControlledVerificationResult>
+    cancel: (confirmationId: string) => Promise<ControlledVerificationCancelResult>
+  }
 }
 
 const api: AgentWorkbenchApi = {
@@ -284,6 +295,11 @@ const api: AgentWorkbenchApi = {
   },
   verification: {
     inspect: (contract) => ipcRenderer.invoke(IPC_CHANNELS.VERIFICATION_INSPECT, { contract })
+  },
+  controlledVerification: {
+    preview: (req) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_PREVIEW, req),
+    confirm: (confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_CONFIRM, confirmationId),
+    cancel: (confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_CANCEL, confirmationId)
   }
 }
 

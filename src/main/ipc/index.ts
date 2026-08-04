@@ -12,6 +12,7 @@ import { registerCapsuleHandlers } from './capsule'
 import { registerSessionHandlers } from './session'
 import { registerActionHandlers } from './action'
 import { registerVerificationHandlers } from './verification'
+import { registerControlledVerificationHandlers } from './controlled-verification'
 import { registerWorkspaceHandlers } from '../services/workspace-foundation/workspace-ipc'
 import { ClaudeProcessManager } from '../services/claude-process'
 import { FileSecretStore } from '../services/secret-store'
@@ -42,5 +43,6 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
     return Boolean(status && ['starting', 'running', 'stopping'].includes(status))
   })
   registerVerificationHandlers()
+  registerControlledVerificationHandlers()
   actionManager = registerActionHandlers(() => sessionManager.getSnapshot())
 }

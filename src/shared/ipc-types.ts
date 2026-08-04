@@ -272,5 +272,10 @@ export const IPC_CHANNELS = {
   WORKSPACE_CHOOSE: 'workspace:choose',
   WORKSPACE_CLEAR: 'workspace:clear',
   WORKSPACE_CHANGED: 'workspace:changed',
-  VERIFICATION_INSPECT: 'verification:inspect'
+  VERIFICATION_INSPECT: 'verification:inspect',
+
+  // Controlled verification (R2B2B + R2C): immutable preview, one-time confirm
+  CONTROLLED_VERIFICATION_PREVIEW: 'controlled-verification:preview',
+  CONTROLLED_VERIFICATION_CONFIRM: 'controlled-verification:confirm',
+  CONTROLLED_VERIFICATION_CANCEL: 'controlled-verification:cancel'
 } as const
