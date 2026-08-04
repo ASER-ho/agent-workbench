@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VerificationContract, VerificationInspection } from '../../../shared/verification-types'
+import type {
+  ControlledVerificationPreview,
+  ControlledVerificationResult
+} from '../../../shared/controlled-verification-execution-types'
 import { useLocale } from '../../contexts/LocaleContext'
 import { createInspectionGuard, sameWorkspace } from './inspection-guard'
 
@@ -29,6 +33,11 @@ export default function VerificationWorkbench() {
   const [result, setResult] = useState<VerificationInspection | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [testPath, setTestPath] = useState('test/example.test.mjs')
+  const [preview, setPreview] = useState<ControlledVerificationPreview | null>(null)
+  const [cvResult, setCvResult] = useState<ControlledVerificationResult | null>(null)
+  const [cvBusy, setCvBusy] = useState(false)
+  const [cvError, setCvError] = useState('')
   const guardRef = useRef(createInspectionGuard())
   // 工作区身份以 ref 跟踪，比较在 updater 之外进行，避免 updater 内部副作用
   const workspaceRef = useRef<WorkspaceStatus | null>(null)
@@ -37,6 +46,10 @@ export default function VerificationWorkbench() {
     guardRef.current.invalidate()
     setResult(null)
     setBusy(false)
+    setPreview(null)
+    setCvResult(null)
+    setCvError('')
+    setCvBusy(false)
   }, [])
 
   const setContractField = useCallback(<K extends keyof VerificationContract>(key: K, value: VerificationContract[K]) => {
@@ -85,6 +98,8 @@ export default function VerificationWorkbench() {
     contract.allowedPaths.length && contract.acceptanceCriteria.length && contract.knownRisks.length
   ), [workspace, contract])
 
+  const previewReady = useMemo(() => Boolean(ready && testPath.trim()), [ready, testPath])
+
   const chooseWorkspace = async () => {
     setError('')
     setBusy(true)
@@ -130,7 +145,83 @@ export default function VerificationWorkbench() {
     }
   }
 
+  const generatePreview = async () => {
+    if (!previewReady) return
+    setCvError('')
+    let freshWorkspace: WorkspaceStatus | null = null
+    try {
+      freshWorkspace = await window.api.workspaceSelection.getStatus()
+    } catch {
+      invalidate()
+      setCvError(t('verification.workspaceFailed'))
+      return
+    }
+    if (!freshWorkspace?.selected || freshWorkspace.displayId !== workspaceRef.current?.displayId) {
+      applyWorkspace(freshWorkspace)
+      setCvError(t('verification.workspaceFailed'))
+      return
+    }
+    const requestId = guardRef.current.begin()
+    setCvBusy(true)
+    try {
+      const next = await window.api.controlledVerification.preview({ testPath: testPath.trim(), contract })
+      if (!guardRef.current.shouldAccept(requestId)) return
+      setPreview(next)
+      setCvResult(null)
+    } catch (err) {
+      if (guardRef.current.shouldAccept(requestId)) {
+        const message = err instanceof Error ? err.message : String(err)
+        setCvError(`${t('cv.previewFailed')} ${message}`)
+      }
+    } finally {
+      if (guardRef.current.shouldAccept(requestId)) {
+        setCvBusy(false)
+      }
+    }
+  }
+
+  const confirmExecute = async () => {
+    if (!preview) return
+    setCvError('')
+    const requestId = guardRef.current.begin()
+    setCvBusy(true)
+    try {
+      const next = await window.api.controlledVerification.confirm(preview.confirmationId)
+      if (!guardRef.current.shouldAccept(requestId)) return
+      setCvResult(next)
+    } catch (err) {
+      if (guardRef.current.shouldAccept(requestId)) {
+        const message = err instanceof Error ? err.message : String(err)
+        setCvError(`${t('cv.executionFailed')} ${message}`)
+      }
+    } finally {
+      if (guardRef.current.shouldAccept(requestId)) {
+        setCvBusy(false)
+      }
+    }
+  }
+
+  const cancelExecute = async () => {
+    if (!preview) return
+    try {
+      await window.api.controlledVerification.cancel(preview.confirmationId)
+    } catch {
+      // best effort; the running command still settles on its own
+    }
+  }
+
   const fieldClass = 'w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500'
+
+  const commandStatusColor = (status: string): string => {
+    switch (status) {
+      case 'PASS': return 'text-emerald-300'
+      case 'FAIL': return 'text-red-300'
+      case 'TIMEOUT': return 'text-amber-300'
+      case 'CANCELLED': return 'text-gray-400'
+      case 'ERROR': return 'text-red-300'
+      default: return 'text-gray-300'
+    }
+  }
 
   return (
     <section className="w-full rounded-xl border border-gray-800 bg-gray-900/70 p-5 text-gray-300" aria-labelledby="verification-heading">
@@ -139,7 +230,7 @@ export default function VerificationWorkbench() {
           <h2 id="verification-heading" className="text-lg font-semibold text-gray-100">{t('verification.title')}</h2>
           <p className="mt-1 text-xs leading-relaxed text-gray-500">{t('verification.subtitle')}</p>
         </div>
-        <span className="rounded-full border border-emerald-800/70 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-300">{t('verification.readOnly')}</span>
+        <span className="rounded-full border border-emerald-800/70 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-300">{t('verification.badge')}</span>
       </div>
 
       <div className="mb-4 rounded-lg border border-gray-800 bg-gray-950/60 p-3">
@@ -183,7 +274,7 @@ export default function VerificationWorkbench() {
         </label>
       </div>
 
-      <p className="mt-3 text-xs text-amber-300/80">{t('verification.noCommand')}</p>
+      {!cvResult && <p className="mt-3 text-xs text-amber-300/80">{t('verification.noCommand')}</p>}
       {error && <p role="alert" className="mt-3 rounded-md border border-red-900/70 bg-red-950/40 p-3 text-xs text-red-300">{error}</p>}
       <button type="button" onClick={inspect} disabled={!ready || busy} className="mt-4 w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
         {busy ? t('verification.inspecting') : t('verification.inspect')}
@@ -230,6 +321,152 @@ export default function VerificationWorkbench() {
           </div>
         </div>
       )}
+
+      {/* ── 受控验证执行（Task 7） ─────────────────────────────── */}
+      <div className="mt-6 rounded-lg border border-gray-800 bg-gray-950/60 p-4" role="region" aria-labelledby="cv-heading" aria-label={t('cv.title')}>
+        <h3 id="cv-heading" className="text-sm font-semibold text-gray-200">{t('cv.title')}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">{t('cv.intro')}</p>
+
+        <div className="mt-3 grid gap-3">
+          <label className="grid gap-1 text-xs text-gray-500">
+            {t('cv.testPathLabel')}
+            <input
+              className={fieldClass}
+              aria-label={t('cv.testPathLabel')}
+              value={testPath}
+              placeholder={t('cv.testPathPlaceholder')}
+              onChange={event => {
+                setTestPath(event.target.value)
+                setPreview(null)
+                setCvResult(null)
+              }}
+            />
+          </label>
+        </div>
+
+        {!workspace?.selected && <p className="mt-3 text-xs text-gray-600">{t('cv.workspaceMissing')}</p>}
+        {cvError && <p role="alert" className="mt-3 rounded-md border border-red-900/70 bg-red-950/40 p-3 text-xs text-red-300">{cvError}</p>}
+
+        <button
+          type="button"
+          onClick={generatePreview}
+          disabled={!previewReady || cvBusy}
+          className="mt-3 w-full rounded-md border border-indigo-700 bg-indigo-950/40 px-4 py-2 text-sm font-medium text-indigo-200 hover:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {cvBusy && !preview ? t('cv.generating') : t('cv.generatePreview')}
+        </button>
+
+        {preview && (
+          <div className="mt-4 space-y-3" aria-live="polite">
+            <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.command')}</span>
+                <code className="min-w-0 truncate text-gray-200">{preview.commandPreview}</code>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.timeout')}</span>
+                <span className="text-gray-300">{preview.timeoutMs / 1000}s</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.codeDigest')}</span>
+                <code className="min-w-0 max-w-[60%] truncate text-gray-300">{preview.subjectDigest}</code>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.isolation')}</span>
+                <span className="min-w-0 text-right text-gray-300">{preview.isolationLevels.join(', ')}</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.environmentProfile')}</span>
+                <code className="min-w-0 truncate text-gray-300">{preview.environmentProfile}</code>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.expiration')}</span>
+                <span className="min-w-0 text-right text-gray-300">{new Date(preview.expiration).toLocaleString()}</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <span className="shrink-0 text-gray-500">{t('cv.previewHash')}</span>
+                <code className="min-w-0 max-w-[60%] truncate text-gray-400">{preview.previewHash}</code>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={confirmExecute}
+                disabled={cvBusy}
+                className="flex-1 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {cvBusy ? t('cv.confirming') : t('cv.confirmExecute')}
+              </button>
+              <button
+                type="button"
+                onClick={cancelExecute}
+                disabled={!cvBusy}
+                className="rounded-md border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t('cv.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cvResult && (
+          <div className="mt-4 space-y-3" aria-live="polite">
+            {cvResult.state === 'rejected' ? (
+              <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3">
+                <div className="text-sm font-medium text-amber-300">{t('cv.rejected')}</div>
+                <p className="mt-1 text-xs leading-relaxed text-amber-200/80">{t(`cv.reason.${cvResult.reason}`)}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{t('cv.status')}</span>
+                    <span className={commandStatusColor(cvResult.commandStatus)}>{t(`cv.status.${cvResult.commandStatus}`)}</span>
+                  </div>
+                  {cvResult.exitCode !== null && (
+                    <div className="mt-1.5 flex items-center justify-between gap-3">
+                      <span className="text-gray-500">{t('cv.exitCode')}</span>
+                      <span className="text-gray-300">{cvResult.exitCode}</span>
+                    </div>
+                  )}
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{cvResult.subjectStable ? t('cv.subjectStable') : t('cv.subjectChanged')}</span>
+                    <span className={cvResult.subjectStable ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.subjectStable ? '✓' : '✗'}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{cvResult.evidence ? (cvResult.evidence.valid ? t('cv.evidenceValid') : t('cv.evidenceInvalid')) : '—'}</span>
+                    <span className={cvResult.evidence?.valid ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.evidence?.valid ? '✓' : '✗'}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{cvResult.evidence ? (cvResult.evidence.fresh ? t('cv.evidenceFresh') : t('cv.evidenceStale')) : '—'}</span>
+                    <span className={cvResult.evidence?.fresh ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.evidence?.fresh ? '✓' : '✗'}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{t('cv.criterionVerdict')}</span>
+                    <span className={cvResult.criterion.verdict === 'VERIFIED' ? 'text-emerald-300' : cvResult.criterion.verdict === 'FAILED' ? 'text-red-300' : 'text-amber-300'}>
+                      {t(`cv.verdict.${cvResult.criterion.verdict}`)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.stdout')}{cvResult.stdoutTruncated ? ` ${t('cv.truncated')}` : ''}</h4>
+                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-400 whitespace-pre-wrap break-all">{cvResult.stdout || '(empty)'}</pre>
+                </div>
+                <div>
+                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.stderr')}{cvResult.stderrTruncated ? ` ${t('cv.truncated')}` : ''}</h4>
+                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-400 whitespace-pre-wrap break-all">{cvResult.stderr || '(empty)'}</pre>
+                </div>
+                <div>
+                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.decisionTrace')}</h4>
+                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-500">{cvResult.criterion.decisionTrace.join('\n')}</pre>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   )
 }
