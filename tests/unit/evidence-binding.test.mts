@@ -16,6 +16,10 @@ const SUBJECT: SubjectSnapshot = {
   subjectDigest: ''
 }
 
+// 真实 digest 作为默认绑定：request 与匹配证据共享同一 policyDigest/subjectDigest
+const DEFAULT_POLICY_DIGEST = digestPolicyDescriptor(POLICY)
+const DEFAULT_SUBJECT_DIGEST = digestSubjectSnapshot(SUBJECT)
+
 function policyWith(content: Partial<PolicyDescriptor> = {}): PolicyDescriptor {
   return { ...POLICY, ...content }
 }
@@ -29,8 +33,8 @@ function request(overrides: Partial<EvaluationRequest> = {}): EvaluationRequest 
     criterionId: 'C-001',
     enabled: true,
     supported: true,
-    policyDigest: POLICY.policyDigest,
-    subjectDigest: SUBJECT.subjectDigest,
+    policyDigest: DEFAULT_POLICY_DIGEST,
+    subjectDigest: DEFAULT_SUBJECT_DIGEST,
     evidence: [],
     ...overrides
   }
@@ -42,8 +46,8 @@ function ev(evidenceId: string, status: 'PASS' | 'FAIL' | 'UNKNOWN', extra: Part
     criterionId: 'C-001',
     status,
     valid: true,
-    policyDigest: POLICY.policyDigest,
-    subjectDigest: SUBJECT.subjectDigest,
+    policyDigest: DEFAULT_POLICY_DIGEST,
+    subjectDigest: DEFAULT_SUBJECT_DIGEST,
     ...extra
   }
 }
@@ -155,11 +159,32 @@ test('binding: evidence order does not change the full result', () => {
   assert.deepEqual(evaluateCriterion(a), evaluateCriterion(b))
 })
 
-test('binding: request without policyDigest and subjectDigest still evaluates (backward compatible)', () => {
+test('binding: request missing policyDigest is fail-closed (no VERIFIED)', () => {
+  const out = evaluateCriterion(request({
+    policyDigest: undefined,
+    evidence: [ev('e1', 'PASS')]
+  }))
+  assert.equal(out.verdict, 'INSUFFICIENT_EVIDENCE', 'missing policyDigest must not allow VERIFIED')
+  assert.equal(out.ruleId, 'EVAL_V1_NO_VALID_EVIDENCE')
+})
+
+test('binding: request missing subjectDigest is fail-closed (no VERIFIED)', () => {
+  const out = evaluateCriterion(request({
+    subjectDigest: undefined,
+    evidence: [ev('e1', 'PASS')]
+  }))
+  assert.equal(out.verdict, 'INSUFFICIENT_EVIDENCE', 'missing subjectDigest must not allow VERIFIED')
+  assert.equal(out.ruleId, 'EVAL_V1_NO_VALID_EVIDENCE')
+})
+
+test('binding: fail-closed still reports NOT_EVALUATED before digest check', () => {
+  // 规则顺序：disabled/unsupported 优先于 digest 绑定检查
   const out = evaluateCriterion(request({
     policyDigest: undefined,
     subjectDigest: undefined,
-    evidence: [ev('e1', 'PASS', { policyDigest: undefined, subjectDigest: undefined })]
+    enabled: false,
+    evidence: [ev('e1', 'PASS')]
   }))
-  assert.equal(out.verdict, 'VERIFIED')
+  assert.equal(out.verdict, 'NOT_EVALUATED', 'disabled wins over missing digest')
+  assert.equal(out.ruleId, 'EVAL_V1_DISABLED')
 })

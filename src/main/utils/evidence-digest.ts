@@ -28,13 +28,19 @@ export function sha256Utf8(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex')
 }
 
+// Type-domain + format-version prefixes so a Policy and a Subject with identical
+// canonicalized content still hash to distinct digests, and so future format
+// changes are observable in the digest.
+const POLICY_DIGEST_PREFIX = 'aw-policy-digest-v1\0'
+const SUBJECT_DIGEST_PREFIX = 'aw-subject-digest-v1\0'
+
 /**
  * Digest of a PolicyDescriptor's content fields (policyVersion + evaluatorRuleSet).
  * The policyDigest field itself is excluded to avoid self-reference.
  */
 export function digestPolicyDescriptor(policy: PolicyDescriptor): string {
   const content = { policyVersion: policy.policyVersion, evaluatorRuleSet: policy.evaluatorRuleSet }
-  return sha256Utf8(canonicalStringify(content))
+  return sha256Utf8(POLICY_DIGEST_PREFIX + canonicalStringify(content))
 }
 
 /**
@@ -43,5 +49,5 @@ export function digestPolicyDescriptor(policy: PolicyDescriptor): string {
  */
 export function digestSubjectSnapshot(subject: SubjectSnapshot): string {
   const content = { subjectId: subject.subjectId }
-  return sha256Utf8(canonicalStringify(content))
+  return sha256Utf8(SUBJECT_DIGEST_PREFIX + canonicalStringify(content))
 }
