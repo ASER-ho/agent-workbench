@@ -41,6 +41,7 @@ import {
   type ControlledVerificationRejectionReason
 } from '../../shared/controlled-verification-execution-types.ts'
 import { canonicalStringify, digestPolicyDescriptor, sha256Utf8 } from '../utils/evidence-digest.ts'
+import { resolveSafeTestTarget } from './verification-safe-path.ts'
 import { sanitizeForShare } from './controlled-action.ts'
 import { GitVerificationService } from './git-verification.ts'
 import type { TrustedNodeResult } from './trusted-node-executable.ts'
@@ -94,6 +95,11 @@ interface PendingConfirmation {
   policyDigest: string
   subjectDigest: string
   recipe: NodeTestRecipe
+  /** Canonical absolute target inside the workspace (Main-only, never across IPC). */
+  canonicalTarget: string
+  /** Digest of the canonical target, bound into the preview hash. */
+  targetDigest: string
+  /** Display command args for the user (relative path); execution uses canonicalTarget. */
   args: string[]
   node: Extract<TrustedNodeResult, { trusted: true }>
   expiration: number
@@ -210,6 +216,15 @@ export class ControlledVerificationManager {
     const workspace = this.workspaceProvider()
     if (!workspace) throw new Error('Select a workspace before generating a verification preview')
 
+    // BLOCKER-1: resolve the test target to a canonical path inside the workspace,
+    // rejecting any symlink/junction/reparse component. This runs before the
+    // snapshot so the testPath escape is rejected directly and independently of
+    // the Subject Snapshot's untracked-file checks. The canonical target and its
+    // digest are bound into the preview; the absolute path never crosses IPC.
+    const safeTarget = resolveSafeTestTarget(workspace.cwd, recipe.testPath)
+    if (!safeTarget.ok) throw new Error(safeTarget.reason)
+    const targetDigest = sha256Utf8(canonicalStringify({ target: safeTarget.canonical }))
+
     const snapshot = await this.snapshotService.capture(workspace.cwd)
     if (!snapshot.complete) {
       throw new Error(`Subject snapshot is incomplete: ${snapshot.exclusion ?? 'unknown'}`)
@@ -233,6 +248,7 @@ export class ControlledVerificationManager {
       subjectDigest: snapshot.subjectDigest,
       recipeType: 'node-test-v1',
       testPath: recipe.testPath,
+      targetDigest,
       nodeIdentityDigest: node.identityDigest,
       args,
       timeoutMs: recipe.timeoutMs,
@@ -256,6 +272,8 @@ export class ControlledVerificationManager {
       policyDigest,
       subjectDigest: snapshot.subjectDigest,
       recipe,
+      canonicalTarget: safeTarget.canonical,
+      targetDigest,
       args,
       node,
       expiration,
@@ -275,25 +293,38 @@ export class ControlledVerificationManager {
 
     const pending = this.pending
     if (!pending || pending.confirmationId !== confirmationId) return reject('CONFIRMATION_NOT_FOUND')
+
+    // MAJOR-1: consume the confirmation synchronously BEFORE the first await, so a
+    // concurrent confirm of the same id can never both pass the used-check. Once
+    // consumed, the confirmation stays `used` and can never be restored, so later
+    // confirms (replays) are rejected as CONFIRMATION_CONSUMED, including after
+    // execution failures or cancellation.
     if (pending.used) return reject('CONFIRMATION_CONSUMED')
     if (this.now() > pending.expiration) {
       pending.used = true
       return reject('CONFIRMATION_EXPIRED')
     }
+    pending.used = true
 
     const workspace = this.workspaceProvider()
     if (!workspace || workspace.workspaceDisplayId !== pending.workspaceDisplayId || workspace.cwd !== pending.cwd) {
       return reject('CONFIRMATION_STALE')
     }
 
+    // BLOCKER-1: re-resolve the test target and require its digest to still match
+    // the preview-bound target. If the file/junction was swapped after preview,
+    // the digest differs and the confirmation is stale (node never launches).
+    const safeTarget = resolveSafeTestTarget(workspace.cwd, pending.recipe.testPath)
+    if (!safeTarget.ok || sha256Utf8(canonicalStringify({ target: safeTarget.canonical })) !== pending.targetDigest) {
+      return reject('CONFIRMATION_STALE')
+    }
+    pending.canonicalTarget = safeTarget.canonical
+
     // Fail-closed pre-execution Subject Snapshot: the current code state must
     // still equal the state the user previewed.
     const snapshotBefore = await this.snapshotService.capture(workspace.cwd)
     if (!snapshotBefore.complete) return reject('SUBJECT_SNAPSHOT_INCOMPLETE')
     if (snapshotBefore.subjectDigest !== pending.subjectDigest) return reject('CONFIRMATION_STALE')
-
-    pending.used = true
-    this.pending = pending
 
     const startedAt = new Date()
     const run = await this.runNodeTest(confirmationId, pending)
@@ -416,7 +447,10 @@ export class ControlledVerificationManager {
   private runNodeTest(confirmationId: string, pending: PendingConfirmation): Promise<CommandRun> {
     return new Promise((resolveRun) => {
       const executable = pending.node.executable
-      const args = pending.args
+      // BLOCKER-1: execute the re-verified canonical target (absolute path inside
+      // the workspace), never the user-supplied relative path, so a junction swap
+      // between confirm and spawn cannot redirect node outside the workspace.
+      const args = ['--test', pending.canonicalTarget]
       const cwd = pending.cwd
       const env = buildAllowlistedEnv(process.env)
       const timeoutMs = pending.recipe.timeoutMs

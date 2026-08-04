@@ -69,6 +69,8 @@ export interface ControlledVerificationPreview {
   subjectDigest: string
   recipeType: 'node-test-v1'
   testPath: string
+  /** Digest of the canonical resolved target inside the workspace (display-safe; never the absolute path). */
+  targetDigest: string
   nodeIdentityDigest: string
   args: string[]
   timeoutMs: number
