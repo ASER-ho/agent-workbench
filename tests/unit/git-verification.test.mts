@@ -6,16 +6,18 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import {
+  decodeWhereOutputCandidates,
   GitVerificationService,
   parsePorcelainV1Z,
   resolveTrustedGitExecutable,
+  resolveWhereGitExecutable,
   sanitizeGitError
 } from '../../src/main/services/git-verification.ts'
 
 function gitPath(): string {
-  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows'
-  const output = execFileSync(join(systemRoot, 'System32', 'where.exe'), ['git.exe'], { encoding: 'utf8' })
-  return resolveTrustedGitExecutable(output.split(/\r?\n/).filter(Boolean))
+  const resolved = resolveWhereGitExecutable()
+  if (!resolved) throw new Error('Test requires a trusted git.exe')
+  return resolved
 }
 
 function runGit(git: string, root: string, args: string[]): string {
@@ -105,4 +107,23 @@ test('Git verification marks safe summary truncation and sanitizes Git errors', 
     assert.equal(safe.includes(fx.root), false)
     assert.equal(safe.includes(fakeSecret), false)
   } finally { fx.cleanup() }
+})
+
+test('decodeWhereOutputCandidates recovers non-ASCII git.exe path from fixed GBK bytes', () => {
+  // "F:\GW\GW下载\Git\cmd\git.exe\r\n" 的 GBK 字节：下载 = cf c2 d4 d8
+  const gbk = Buffer.from('463a5c47575c4757cfc2d4d85c4769745c636d645c6769742e6578650d0a', 'hex')
+  const candidates = decodeWhereOutputCandidates(gbk)
+  assert.ok(candidates.includes('F:\\GW\\GW下载\\Git\\cmd\\git.exe'), JSON.stringify(candidates))
+})
+
+test('decodeWhereOutputCandidates keeps strict UTF-8 paths and drops blank lines and duplicates', () => {
+  const utf8 = Buffer.from('C:\\Program Files\\Git\\cmd\\git.exe\r\n\r\nC:\\Program Files\\Git\\cmd\\git.exe\r\n', 'utf8')
+  const candidates = decodeWhereOutputCandidates(utf8)
+  assert.deepEqual(candidates, ['C:\\Program Files\\Git\\cmd\\git.exe'])
+})
+
+test('decodeWhereOutputCandidates yields nothing for bytes invalid in both strict decoders', () => {
+  // 0xF0 单独不是合法 GBK（首字节范围 0x81-0xFE 但缺尾字节），也不是合法 UTF-8 前缀
+  const bad = Buffer.from([0xf0])
+  assert.deepEqual(decodeWhereOutputCandidates(bad), [])
 })

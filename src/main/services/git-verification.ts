@@ -83,6 +83,49 @@ export function resolveTrustedGitExecutable(candidates: readonly string[]): stri
   throw new Error('Trusted absolute git.exe is unavailable')
 }
 
+function strictDecoder(label: string): TextDecoder | null {
+  try { return new TextDecoder(label, { fatal: true }) } catch { return null }
+}
+
+export function decodeWhereOutputCandidates(buffer: Buffer): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const attempts: string[] = []
+  const gbk = strictDecoder('gbk')
+  if (gbk) {
+    try { attempts.push(gbk.decode(buffer)) } catch { /* strict decode failed */ }
+  }
+  const utf8 = strictDecoder('utf-8')
+  if (utf8) {
+    try { attempts.push(utf8.decode(buffer)) } catch { /* strict decode failed */ }
+  }
+  for (const text of attempts) {
+    for (const line of text.split(/\r?\n/)) {
+      const t = line.trim()
+      if (!t || seen.has(t)) continue
+      seen.add(t)
+      out.push(t)
+    }
+  }
+  return out
+}
+
+export function resolveWhereGitExecutable(): string | null {
+  const systemRoot = process.env['SystemRoot'] ?? process.env['WINDIR'] ?? 'C:\\Windows'
+  const wherePath = join(systemRoot, 'System32', 'where.exe')
+  if (!existsSync(wherePath)) return null
+  const located = spawnSync(wherePath, ['git.exe'], {
+    shell: false, windowsHide: true, encoding: 'buffer', timeout: 3_000, maxBuffer: 32 * 1024,
+    env: { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: process.env['PATH'] }
+  })
+  if (located.status !== 0) return null
+  for (const candidate of decodeWhereOutputCandidates(located.stdout)) {
+    const trusted = trustedLocalExecutable(candidate)
+    if (trusted) return trusted
+  }
+  return null
+}
+
 function discoverTrustedGitExecutable(): string {
   const candidates: string[] = []
   if (process.env['AGENT_WORKBENCH_E2E'] === '1' && process.env['AGENT_WORKBENCH_E2E_GIT_EXECUTABLE']) {
@@ -92,15 +135,8 @@ function discoverTrustedGitExecutable(): string {
   const localAppData = process.env['LOCALAPPDATA']
   if (programFiles) candidates.push(join(programFiles, 'Git', 'cmd', 'git.exe'), join(programFiles, 'Git', 'bin', 'git.exe'))
   if (localAppData) candidates.push(join(localAppData, 'Programs', 'Git', 'cmd', 'git.exe'))
-  const systemRoot = process.env['SystemRoot'] ?? process.env['WINDIR'] ?? 'C:\\Windows'
-  const wherePath = join(systemRoot, 'System32', 'where.exe')
-  if (existsSync(wherePath)) {
-    const located = spawnSync(wherePath, ['git.exe'], {
-      shell: false, windowsHide: true, encoding: 'utf8', timeout: 3_000, maxBuffer: 32 * 1024,
-      env: { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: process.env['PATH'] }
-    })
-    if (located.status === 0) candidates.push(...String(located.stdout).split(/\r?\n/).filter(Boolean))
-  }
+  const viaWhere = resolveWhereGitExecutable()
+  if (viaWhere) candidates.push(viaWhere)
   return resolveTrustedGitExecutable(candidates)
 }
 

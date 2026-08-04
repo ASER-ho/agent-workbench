@@ -5,14 +5,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+import { resolveWhereGitExecutable } from '../../src/main/services/git-verification'
+
 let app: ElectronApplication | undefined
 let page: Page
 let root = ''
 let git = ''
 
 function findGit(): string {
-  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows'
-  return execFileSync(join(systemRoot, 'System32', 'where.exe'), ['git.exe'], { encoding: 'utf8' }).split(/\r?\n/).find(Boolean)!.trim()
+  const resolved = resolveWhereGitExecutable()
+  if (!resolved) throw new Error('E2E requires a trusted git.exe')
+  return resolved
 }
 
 function runGit(cwd: string, args: string[]): void {
