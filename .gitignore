@@ -16,6 +16,7 @@ node_modules/
 # ─── Build output ───
 out/
 dist/
+dist-0.1.1-alpha/
 build/
 .cache/
 .vite/
