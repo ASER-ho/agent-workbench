@@ -17,6 +17,7 @@ node_modules/
 out/
 dist/
 dist-0.1.1-alpha/
+dist-0.1.1/
 build/
 .cache/
 .vite/
