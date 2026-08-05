@@ -135,6 +135,55 @@ test('receipt: acceptanceDecision is fixed to NOT_RECORDED', () => {
   assert.doesNotMatch(JSON.stringify(receipt), /"ACCEPT"|"REJECT"/)
 })
 
+test('receipt: duplicate criterionResult criterionId is rejected fail-closed', () => {
+  const input = baseInput()
+  input.criterionResults = [
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', verdict: 'VERIFIED', ruleId: 'R1', decisionTrace: ['a'] },
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', verdict: 'FAILED', ruleId: 'R2', decisionTrace: ['b'] }
+  ]
+  assert.throws(() => buildVerificationReceipt(input), /DUPLICATE_CRITERION_ID/)
+})
+
+test('receipt: duplicate evidence evidenceId is rejected fail-closed', () => {
+  const input = baseInput()
+  input.evidence = [
+    { evidenceId: 'ev-x', criterionId: 'C-FUNCTIONAL-VERIFIED', result: 'PASS', valid: true, policyDigest: 'p', subjectDigest: 's', observedAt: '2026-08-05T10:00:00.000Z', exclusionReason: null },
+    { evidenceId: 'ev-x', criterionId: 'C-FUNCTIONAL-VERIFIED', result: 'FAIL', valid: true, policyDigest: 'p', subjectDigest: 's', observedAt: '2026-08-05T10:00:00.000Z', exclusionReason: null }
+  ]
+  assert.throws(() => buildVerificationReceipt(input), /DUPLICATE_EVIDENCE_ID/)
+})
+
+test('receipt: duplicate contract criterion criterionId is rejected fail-closed', () => {
+  const input = baseInput()
+  input.contract.criteria = [
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', title: 'one' },
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', title: 'two' }
+  ]
+  assert.throws(() => buildVerificationReceipt(input), /DUPLICATE_CRITERION_ID/)
+})
+
+test('receipt: duplicate rejection is independent of input order', () => {
+  const input = baseInput()
+  input.criterionResults = [
+    { criterionId: 'C-002', verdict: 'FAILED', ruleId: 'R2', decisionTrace: ['b'] },
+    { criterionId: 'C-001', verdict: 'VERIFIED', ruleId: 'R1', decisionTrace: ['a'] },
+    { criterionId: 'C-001', verdict: 'INSUFFICIENT_EVIDENCE', ruleId: 'R3', decisionTrace: ['c'] }
+  ]
+  assert.throws(() => buildVerificationReceipt(input), /DUPLICATE_CRITERION_ID/)
+})
+
+test('receipt: duplicate error is stable and contains no private path', () => {
+  const input = baseInput()
+  input.criterionResults = [
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', verdict: 'VERIFIED', ruleId: 'R1', decisionTrace: ['a'] },
+    { criterionId: 'C-FUNCTIONAL-VERIFIED', verdict: 'FAILED', ruleId: 'R2', decisionTrace: ['b'] }
+  ]
+  let message = ''
+  try { buildVerificationReceipt(input) } catch (e) { message = e instanceof Error ? e.message : String(e) }
+  assert.match(message, /DUPLICATE_CRITERION_ID/)
+  assert.doesNotMatch(message, /C:\\|F:\\|node\.exe|sk-[A-Za-z0-9]{20}/i)
+})
+
 test('receipt: every contract/subject/policy/verdict change changes the digest', () => {
   const baseline = buildVerificationReceipt(baseInput())
   const variants = [
