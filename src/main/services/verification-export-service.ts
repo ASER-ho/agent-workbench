@@ -38,13 +38,35 @@ const UNC_OR_DEVICE_RE = /^(?:\\\\|\/\/|\\[?.]\\)/
 export interface VerificationExportServiceOptions {
   /** Injected save-path resolver (tests). Production uses dialog.showSaveDialog. */
   resolveSavePath?: (defaultName: string) => Promise<string | null>
+  /** Injected packaged flag (tests). Production defaults to app.isPackaged. */
+  isPackaged?: () => boolean
+}
+
+/**
+ * Pure decision: returns a test-directory override path when (and only when) the
+ * app is NOT packaged AND both E2E env vars are present. In any packaged build,
+ * or when either env var is missing, returns null so the system save dialog is
+ * used. The renderer can never control these inputs.
+ */
+export function e2eExportDirOverride(
+  env: NodeJS.ProcessEnv,
+  isPackaged: boolean,
+  defaultName: string
+): string | null {
+  if (isPackaged) return null
+  if (env['AGENT_WORKBENCH_E2E'] !== '1') return null
+  const dir = env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+  if (!dir) return null
+  return join(dir, defaultName)
 }
 
 export class VerificationExportService {
   private readonly resolveSavePath: (defaultName: string) => Promise<string | null>
+  private readonly isPackaged: () => boolean
 
   constructor(options: VerificationExportServiceOptions = {}) {
     this.resolveSavePath = options.resolveSavePath ?? this.promptForSavePath
+    this.isPackaged = options.isPackaged ?? (() => false)
   }
 
   async export(request: ExportRequest): Promise<ExportResult> {
@@ -85,16 +107,15 @@ export class VerificationExportService {
   }
 
   private async pickPath(defaultName: string): Promise<string | null> {
+    // E2E test hook is only reachable when NOT packaged AND both E2E env vars are
+    // present. In a packaged app (or when either env var is missing) the system
+    // save dialog is always used.
+    const override = e2eExportDirOverride(process.env, this.isPackaged(), defaultName)
+    if (override) return override
     return this.resolveSavePath(defaultName)
   }
 
   private async promptForSavePath(defaultName: string): Promise<string | null> {
-    // E2E hook: when the test sets an export directory, write directly there
-    // instead of opening the system save dialog. Production never sets this.
-    const e2eExportDir = process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
-    if (e2eExportDir && process.env['AGENT_WORKBENCH_E2E'] === '1') {
-      return join(e2eExportDir, defaultName)
-    }
     const { dialog, BrowserWindow } = await import('electron')
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
     const options = {

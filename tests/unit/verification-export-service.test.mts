@@ -114,3 +114,56 @@ test('export: handoff markdown content is deterministic and matches receipt', ()
   assert.equal(a, b)
   assert.ok(a.includes(receiptValue.receiptDigest))
 })
+
+test('export: e2e export dir hook is ignored when app is packaged', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    process.env['AGENT_WORKBENCH_E2E'] = '1'
+    process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR'] = dir
+    // Packaged app must ignore the test dir and call the save dialog (inject a
+    // resolver that records whether it was reached).
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      isPackaged: () => true,
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    } as unknown as VerificationExportService)
+    const result = await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, true, 'packaged app must use the save dialog, not the test dir')
+    assert.equal(result.ok, false, 'dialog cancelled -> export fails')
+    // The test dir must NOT have been written.
+    assert.equal(existsSync(join(dir, 'verification-receipt.json')), false)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('export: e2e export dir hook requires both e2e env vars', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    // Missing AGENT_WORKBENCH_E2E_EXPORT_DIR -> dialog must be used.
+    process.env['AGENT_WORKBENCH_E2E'] = '1'
+    delete process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      isPackaged: () => false,
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    } as unknown as VerificationExportService)
+    await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, true, 'missing export dir must use the save dialog')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('export: non-packaged + both e2e env vars still use the test dir', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    process.env['AGENT_WORKBENCH_E2E'] = '1'
+    process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR'] = dir
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      isPackaged: () => false,
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    } as unknown as VerificationExportService)
+    const result = await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, false, 'non-packaged + e2e env must use the test dir, not the dialog')
+    assert.ok(result.ok)
+    assert.equal(existsSync(join(dir, 'verification-receipt.json')), true)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
