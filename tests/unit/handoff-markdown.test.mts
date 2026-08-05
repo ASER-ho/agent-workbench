@@ -136,3 +136,44 @@ test('handoff: repeated rendering is deterministic', () => {
   const receipt = buildVerificationReceipt(baseInput())
   assert.equal(renderHandoffMarkdown(receipt), renderHandoffMarkdown(receipt))
 })
+
+test('handoff: malicious contract text does not break the fixed structure', () => {
+  const input = baseInput()
+  input.contract.contractId = '<script>alert(1)</script>'
+  input.contract.criteria = [{ criterionId: 'C-FUNCTIONAL-VERIFIED', title: '**FAKE VERIFIED**' }]
+  input.workspace.displayId = '[link](file:///C:/private/path)'
+  input.verification.displaySafeCommand = '`code`'
+  const markdown = renderHandoffMarkdown(buildVerificationReceipt(input))
+  // Fixed sections must remain intact.
+  for (const section of ['## 1. Verification Summary', '## 2. Contract and Criteria', '## 8. Acceptance Decision', '## 10. Receipt Identity']) {
+    assert.ok(markdown.includes(section), `section ${section} broken by malicious text`)
+  }
+  // No raw HTML tags.
+  assert.doesNotMatch(markdown, /<script>|<\/script>|<[a-z]+ /i)
+  // No active markdown links.
+  assert.doesNotMatch(markdown, /\]\(file:\/\/\//)
+  // Acceptance decision stays NOT_RECORDED.
+  assert.match(markdown, /Acceptance Decision: NOT_RECORDED/)
+  assert.doesNotMatch(markdown, /Acceptance Decision: ACCEPT/)
+})
+
+test('handoff: secrets and absolute paths are redacted and escaped', () => {
+  const input = baseInput()
+  input.contract.contractId = 'sk-abcdefghijklmnopqrstuvwxyz'
+  input.workspace.displayId = 'C:\\Users\\secret\\workspace'
+  input.verification.displaySafeCommand = 'ghp_abcdefghijklmnopqrstuvwxyz'
+  const markdown = renderHandoffMarkdown(buildVerificationReceipt(input))
+  assert.doesNotMatch(markdown, /sk-[A-Za-z0-9]{20}/i)
+  assert.doesNotMatch(markdown, /ghp_[A-Za-z0-9]{20}/i)
+  assert.doesNotMatch(markdown, /C:\\Users\\secret/i)
+  assert.doesNotMatch(markdown, /C:\\Users/i)
+})
+
+test('handoff: inline code and emphasis cannot inject active markdown', () => {
+  const input = baseInput()
+  input.verification.displaySafeCommand = '`code` **bold** *italic* [x](https://evil.example)'
+  const markdown = renderHandoffMarkdown(buildVerificationReceipt(input))
+  // The literal backticks/emphasis must be escaped so they cannot form active markdown.
+  assert.doesNotMatch(markdown, /\*\*bold\*\*/)
+  assert.doesNotMatch(markdown, /\]\(https:\/\/evil/)
+})
