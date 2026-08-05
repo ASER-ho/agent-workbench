@@ -167,3 +167,89 @@ test('export: non-packaged + both e2e env vars still use the test dir', async ()
     assert.equal(existsSync(join(dir, 'verification-receipt.json')), true)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+// ── MAJOR-4 (final): default construction must be fail-closed ────────────────
+
+test('MAJOR4: default construction with e2e env treats as packaged (showSaveDialog, no test dir)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    process.env['AGENT_WORKBENCH_E2E'] = '1'
+    process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR'] = dir
+    // NO isPackaged injection — production default construction path. Must be
+    // fail-closed: E2E dir override is NOT used; the save dialog is reached.
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    })
+    const result = await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, true, 'default construction must use the save dialog')
+    assert.equal(result.ok, false, 'dialog cancelled -> export fails')
+    assert.equal(existsSync(join(dir, 'verification-receipt.json')), false, 'E2E dir must not be written')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    delete process.env['AGENT_WORKBENCH_E2E']
+    delete process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+  }
+})
+
+test('MAJOR4: missing export dir env never uses the test dir', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    process.env['AGENT_WORKBENCH_E2E'] = '1'
+    delete process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      isPackaged: () => false,
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    })
+    const result = await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, true, 'missing export dir env must use the save dialog regardless of packaged state')
+    assert.equal(result.ok, false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    delete process.env['AGENT_WORKBENCH_E2E']
+    delete process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+  }
+})
+
+test('MAJOR4: missing AGENT_WORKBENCH_E2E flag never uses the test dir', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aw-export-'))
+  try {
+    delete process.env['AGENT_WORKBENCH_E2E']
+    process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR'] = dir
+    let dialogCalled = false
+    const svc = new VerificationExportService({
+      isPackaged: () => false,
+      resolveSavePath: async () => { dialogCalled = true; return null }
+    })
+    const result = await svc.export({ kind: 'json', receipt: receipt() })
+    assert.equal(dialogCalled, true, 'missing E2E flag must use the save dialog')
+    assert.equal(result.ok, false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    delete process.env['AGENT_WORKBENCH_E2E']
+    delete process.env['AGENT_WORKBENCH_E2E_EXPORT_DIR']
+  }
+})
+
+// ── MAJOR-4 (final): production IPC wiring must inject Electron packaged state ──
+
+test('MAJOR4: production IPC wiring passes Electron packaged state explicitly (no bare construction)', () => {
+  // Static proof of the real production creation path in
+  // src/main/ipc/controlled-verification.ts. The renderer can never control the
+  // packaged flag or the E2E export dir; only the Main process may inject them.
+  const ipcSource = readFileSync('src/main/ipc/controlled-verification.ts', 'utf8')
+
+  // `app` must come from Electron Main so packaged state cannot be spoofed.
+  assert.match(ipcSource, /import\s*\{[^}]*\bapp\b[^}]*\}\s*from\s*'electron'/)
+
+  // The single production construction passes the real packaged flag explicitly.
+  assert.match(
+    ipcSource,
+    /new\s+VerificationExportService\(\{\s*isPackaged:\s*\(\s*\)\s*=>\s*app\.isPackaged\s*\}\)/
+  )
+
+  // Regression guard: no bare, unparameterized construction may exist at the
+  // production site (that path used to default to `() => false`, i.e. fail-open).
+  assert.doesNotMatch(ipcSource, /new\s+VerificationExportService\(\s*\)/)
+})

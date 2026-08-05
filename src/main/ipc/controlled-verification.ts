@@ -89,7 +89,10 @@ function buildReceiptFromCompleted(
 export function registerControlledVerificationHandlers(): void {
   const e2eGitExecutable = process.env['AGENT_WORKBENCH_E2E_GIT_EXECUTABLE']
   const manager = new ControlledVerificationManager({ gitExecutable: e2eGitExecutable || undefined })
-  const exportService = new VerificationExportService()
+  // Wire the real Electron packaged state into the export service. The renderer
+  // can never control this value; a packaged app always uses the system save
+  // dialog and never the E2E export-dir override.
+  const exportService = new VerificationExportService({ isPackaged: () => app.isPackaged })
 
   ipcMain.handle(IPC_CHANNELS.CONTROLLED_VERIFICATION_PREVIEW, async (_event, raw: unknown) => {
     return manager.createPreview(raw)

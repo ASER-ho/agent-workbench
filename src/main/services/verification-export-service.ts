@@ -38,7 +38,7 @@ const UNC_OR_DEVICE_RE = /^(?:\\\\|\/\/|\\[?.]\\)/
 export interface VerificationExportServiceOptions {
   /** Injected save-path resolver (tests). Production uses dialog.showSaveDialog. */
   resolveSavePath?: (defaultName: string) => Promise<string | null>
-  /** Injected packaged flag (tests). Production defaults to app.isPackaged. */
+  /** Injected packaged flag. Production passes `() => app.isPackaged` explicitly. */
   isPackaged?: () => boolean
 }
 
@@ -66,7 +66,11 @@ export class VerificationExportService {
 
   constructor(options: VerificationExportServiceOptions = {}) {
     this.resolveSavePath = options.resolveSavePath ?? this.promptForSavePath
-    this.isPackaged = options.isPackaged ?? (() => false)
+    // Fail-closed: without an explicit packaged flag we treat the app as
+    // packaged, so the E2E export-dir override is never reachable unless a
+    // caller explicitly opts in with `isPackaged: () => false`. Production
+    // wiring passes `() => app.isPackaged` (see the IPC registration).
+    this.isPackaged = options.isPackaged ?? (() => true)
   }
 
   async export(request: ExportRequest): Promise<ExportResult> {
