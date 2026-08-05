@@ -176,6 +176,24 @@ export class ControlledVerificationManager {
   private gitInspection: GitVerificationService | null = null
   private pending: PendingConfirmation | null = null
   private activeExecution: ActiveExecution | null = null
+  private lastExecuted: ControlledVerificationResult | null = null
+  private lastContract: VerificationContract | null = null
+  private lastPreview: ControlledVerificationPreview | null = null
+
+  /** The most recent executed verification result, retained for Receipt/Handoff export. */
+  getLastExecutedResult(): ControlledVerificationResult | null {
+    return this.lastExecuted
+  }
+
+  /** The contract bound to the most recent preview/execution, retained for Receipt export. */
+  getLastContract(): VerificationContract | null {
+    return this.lastContract
+  }
+
+  /** The most recent immutable preview, retained for Receipt/Handoff export. */
+  getLastPreview(): ControlledVerificationPreview | null {
+    return this.lastPreview
+  }
 
   constructor(options: ControlledVerificationManagerOptions = {}) {
     this.workspaceProvider = options.workspaceProvider ?? getSelectedWorkspaceBinding
@@ -209,6 +227,7 @@ export class ControlledVerificationManager {
     const recipe = recipeResult.recipe
 
     const contract = validateVerificationContract(request.contract)
+    this.lastContract = contract
 
     const node = this.nodeResolver()
     if (!node.trusted) throw new Error(node.reason)
@@ -279,6 +298,7 @@ export class ControlledVerificationManager {
       expiration,
       used: false
     }
+    this.lastPreview = preview
 
     return preview
   }
@@ -379,7 +399,7 @@ export class ControlledVerificationManager {
     // The confirmation stays tracked as `used` so a replay is rejected with
     // CONFIRMATION_CONSUMED (non-replayable). A fresh preview replaces it.
 
-    return {
+    const executedResult: ControlledVerificationResult = {
       state: 'executed',
       confirmationId,
       commandPreview: pending.commandPreview,
@@ -417,6 +437,8 @@ export class ControlledVerificationManager {
         decisionTrace: criterionResult.decisionTrace
       }
     }
+    this.lastExecuted = executedResult
+    return executedResult
   }
 
   cancel(raw: unknown): ControlledVerificationCancelResult {

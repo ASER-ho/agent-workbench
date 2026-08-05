@@ -167,6 +167,7 @@ export interface AgentWorkbenchApi {
     preview: (req: ControlledVerificationPreviewRequest) => Promise<ControlledVerificationPreview>
     confirm: (confirmationId: string) => Promise<ControlledVerificationResult>
     cancel: (confirmationId: string) => Promise<ControlledVerificationCancelResult>
+    exportReceipt: (kind: 'json' | 'md' | 'both') => Promise<{ ok: boolean; error?: string; jsonPath?: string; mdPath?: string }>
   }
 }
 
@@ -299,7 +300,8 @@ const api: AgentWorkbenchApi = {
   controlledVerification: {
     preview: (req) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_PREVIEW, req),
     confirm: (confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_CONFIRM, confirmationId),
-    cancel: (confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_CANCEL, confirmationId)
+    cancel: (confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_CANCEL, confirmationId),
+    exportReceipt: (kind) => ipcRenderer.invoke(IPC_CHANNELS.CONTROLLED_VERIFICATION_EXPORT, { kind })
   }
 }
 

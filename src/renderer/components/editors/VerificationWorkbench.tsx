@@ -38,6 +38,7 @@ export default function VerificationWorkbench() {
   const [cvResult, setCvResult] = useState<ControlledVerificationResult | null>(null)
   const [cvBusy, setCvBusy] = useState(false)
   const [cvError, setCvError] = useState('')
+  const [exportMsg, setExportMsg] = useState('')
   const guardRef = useRef(createInspectionGuard())
   // 工作区身份以 ref 跟踪，比较在 updater 之外进行，避免 updater 内部副作用
   const workspaceRef = useRef<WorkspaceStatus | null>(null)
@@ -198,6 +199,22 @@ export default function VerificationWorkbench() {
       if (guardRef.current.shouldAccept(requestId)) {
         setCvBusy(false)
       }
+    }
+  }
+
+  const exportReceipt = async (kind: 'json' | 'md' | 'both') => {
+    if (!cvResult || cvResult.state !== 'executed') return
+    setExportMsg('')
+    try {
+      const outcome = await window.api.controlledVerification.exportReceipt(kind)
+      if (outcome.ok) {
+        setExportMsg(t('cv.exported'))
+      } else {
+        setExportMsg(`${t('cv.exportFailed')} ${outcome.error ?? ''}`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setExportMsg(`${t('cv.exportFailed')} ${message}`)
     }
   }
 
@@ -461,6 +478,24 @@ export default function VerificationWorkbench() {
                 <div>
                   <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.decisionTrace')}</h4>
                   <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-500">{cvResult.criterion.decisionTrace.join('\n')}</pre>
+                </div>
+                <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">{t('cv.acceptanceDecision')}</span>
+                    <span className="text-gray-300">NOT_RECORDED</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => exportReceipt('json')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+                      {t('cv.exportJson')}
+                    </button>
+                    <button type="button" onClick={() => exportReceipt('md')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+                      {t('cv.exportMarkdown')}
+                    </button>
+                    <button type="button" onClick={() => exportReceipt('both')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+                      {t('cv.exportBoth')}
+                    </button>
+                  </div>
+                  {exportMsg && <p className="mt-2 text-[11px] text-amber-300/80">{exportMsg}</p>}
                 </div>
               </div>
             )}

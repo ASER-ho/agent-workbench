@@ -277,5 +277,6 @@ export const IPC_CHANNELS = {
   // Controlled verification (R2B2B + R2C): immutable preview, one-time confirm
   CONTROLLED_VERIFICATION_PREVIEW: 'controlled-verification:preview',
   CONTROLLED_VERIFICATION_CONFIRM: 'controlled-verification:confirm',
-  CONTROLLED_VERIFICATION_CANCEL: 'controlled-verification:cancel'
+  CONTROLLED_VERIFICATION_CANCEL: 'controlled-verification:cancel',
+  CONTROLLED_VERIFICATION_EXPORT: 'controlled-verification:export'
 } as const
