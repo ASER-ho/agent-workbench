@@ -156,7 +156,11 @@ PUSH_TAG_RELEASE_AUTHORIZATION_REQUIRED
 
 ## Recommendations
 
-- Merge to main: **not yet** — requires user authorization; main stays at `6b1f39b`.
+- **Merged to main: yes.**
+  - Main release metadata commit: `c66bf8cfb3eeaf57245a45070c3aed2fde4b9af1`
+  - Main tree: `b7f76ca52295a612d5823bd35a9b9b2825988b44`
+  - Artifact source commit: `09233a1a7c93f10b889e0d6edf90e10acdf6d38c`
+  - Remote status: not pushed at the time this report was finalized
 - Create `v0.1.1` tag: **not yet** — requires authorization.
 - Create GitHub Prerelease: **not yet** — requires authorization.
 - Push: **not performed**; origin/main unchanged.
