@@ -89,6 +89,8 @@ export interface ControlledVerificationManagerOptions {
 interface PendingConfirmation {
   confirmationId: string
   previewHash: string
+  contract: VerificationContract
+  preview: ControlledVerificationPreview
   workspaceDisplayId: string
   cwd: string
   contractDigest: string
@@ -110,6 +112,20 @@ interface ActiveExecution {
   confirmationId: string
   child: ChildProcessWithoutNullStreams
   cancelRequested: boolean
+}
+
+/**
+ * Atomic completed-verification record. All three members (contract, preview,
+ * execution) originate from ONE confirmation and are snapshotted together when
+ * the execution fully finishes. Export must read ONLY this record, never three
+ * independent getters that could come from different operations.
+ */
+export interface CompletedVerificationRecord {
+  confirmationId: string
+  previewHash: string
+  contract: VerificationContract
+  preview: ControlledVerificationPreview
+  execution: ControlledVerificationResult
 }
 
 interface CommandRun {
@@ -176,23 +192,15 @@ export class ControlledVerificationManager {
   private gitInspection: GitVerificationService | null = null
   private pending: PendingConfirmation | null = null
   private activeExecution: ActiveExecution | null = null
-  private lastExecuted: ControlledVerificationResult | null = null
-  private lastContract: VerificationContract | null = null
-  private lastPreview: ControlledVerificationPreview | null = null
+  private completedVerification: CompletedVerificationRecord | null = null
 
-  /** The most recent executed verification result, retained for Receipt/Handoff export. */
-  getLastExecutedResult(): ControlledVerificationResult | null {
-    return this.lastExecuted
-  }
-
-  /** The contract bound to the most recent preview/execution, retained for Receipt export. */
-  getLastContract(): VerificationContract | null {
-    return this.lastContract
-  }
-
-  /** The most recent immutable preview, retained for Receipt/Handoff export. */
-  getLastPreview(): ControlledVerificationPreview | null {
-    return this.lastPreview
+  /**
+   * The single atomic completed-verification record, or null when no execution
+   * has fully finished for the current preview/contract binding. A new preview
+   * clears it so an export can never mix a new contract with an old execution.
+   */
+  getCompletedVerification(): CompletedVerificationRecord | null {
+    return this.completedVerification
   }
 
   constructor(options: ControlledVerificationManagerOptions = {}) {
@@ -227,7 +235,10 @@ export class ControlledVerificationManager {
     const recipe = recipeResult.recipe
 
     const contract = validateVerificationContract(request.contract)
-    this.lastContract = contract
+
+    // A new preview invalidates any previously completed verification so an
+    // export cannot bind an old execution to this new contract.
+    this.completedVerification = null
 
     const node = this.nodeResolver()
     if (!node.trusted) throw new Error(node.reason)
@@ -285,6 +296,8 @@ export class ControlledVerificationManager {
     this.pending = {
       confirmationId,
       previewHash: preview.previewHash,
+      contract,
+      preview,
       workspaceDisplayId: workspace.workspaceDisplayId,
       cwd: workspace.cwd,
       contractDigest,
@@ -298,8 +311,6 @@ export class ControlledVerificationManager {
       expiration,
       used: false
     }
-    this.lastPreview = preview
-
     return preview
   }
 
@@ -437,7 +448,15 @@ export class ControlledVerificationManager {
         decisionTrace: criterionResult.decisionTrace
       }
     }
-    this.lastExecuted = executedResult
+    // Only after the full execution finishes do we atomically snapshot the
+    // completed record binding contract + preview + execution from THIS confirm.
+    this.completedVerification = {
+      confirmationId,
+      previewHash: pending.previewHash,
+      contract: pending.contract,
+      preview: pending.preview,
+      execution: executedResult
+    }
     return executedResult
   }
 

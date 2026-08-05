@@ -14,15 +14,13 @@ import type { ControlledVerificationResult } from '../../shared/controlled-verif
  * executed result and the contract bound to it. All values come from Main-owned,
  * already-sanitized data — the renderer supplies only the export kind.
  */
-function buildReceiptFromLastExecution(
-  manager: ControlledVerificationManager
+function buildReceiptFromCompleted(
+  record: NonNullable<ReturnType<ControlledVerificationManager['getCompletedVerification']>>
 ): VerificationReceipt | null {
-  const executed = manager.getLastExecutedResult()
-  const contract = manager.getLastContract()
-  const preview = manager.getLastPreview()
-  if (!executed || executed.state !== 'executed' || !contract || !preview) return null
-
-  const result: Extract<ControlledVerificationResult, { state: 'executed' }> = executed
+  if (record.execution.state !== 'executed') return null
+  const contract = record.contract
+  const preview = record.preview
+  const result: Extract<ControlledVerificationResult, { state: 'executed' }> = record.execution
   const evidenceResult = result.evidence
   const unresolvedItems: string[] = []
   if (result.subjectChangedDuringVerification) unresolvedItems.push('SUBJECT_CHANGED_DURING_VERIFICATION')
@@ -110,8 +108,10 @@ export function registerControlledVerificationHandlers(): void {
     if (kind !== 'json' && kind !== 'md' && kind !== 'both') {
       return { ok: false, error: 'invalid export kind' }
     }
-    const receipt = buildReceiptFromLastExecution(manager)
-    if (!receipt) return { ok: false, error: 'no completed verification result to export' }
+    const record = manager.getCompletedVerification()
+    if (!record) return { ok: false, error: 'NO_COMPLETED_VERIFICATION' }
+    const receipt = buildReceiptFromCompleted(record)
+    if (!receipt) return { ok: false, error: 'NO_COMPLETED_VERIFICATION' }
     return exportService.export({ kind, receipt })
   })
 

@@ -523,3 +523,40 @@ test('MAJOR: concurrent confirms of the same confirmationId execute exactly once
     assert.equal(rejectedCount, 1, 'the other confirm must be rejected')
   } finally { fx.cleanup() }
 })
+
+// ── MAJOR-1: atomic completed verification ───────────────────────────────────
+
+test('MAJOR: execution A then preview B clears the completed record (no mixed export)', async () => {
+  const fx = fixture()
+  try {
+    writeTest(fx, 'ok.test.mjs', PASSING_TEST)
+    const manager = newManager(fx)
+
+    // Execute Contract A.
+    const previewA = await manager.createPreview({ testPath: 'test/ok.test.mjs', contract: CONTRACT })
+    const resultA = await manager.confirmAndExecute(previewA.confirmationId)
+    assert.equal(resultA.state, 'executed')
+    const completedA = manager.getCompletedVerification()
+    assert.ok(completedA, 'completed record exists after execution')
+    if (!completedA) return
+    assert.equal(completedA.contract.title, CONTRACT.title, 'completed record binds the executed contract')
+    assert.equal(completedA.preview.confirmationId, previewA.confirmationId)
+    assert.equal(completedA.execution.state, 'executed')
+
+    // Start a new Preview B (no execution). The completed record must clear so
+    // an export cannot mix Contract B with Execution A.
+    const contractB = { ...CONTRACT, title: 'Contract B' }
+    await manager.createPreview({ testPath: 'test/ok.test.mjs', contract: contractB })
+    const completedAfterPreviewB = manager.getCompletedVerification()
+    assert.equal(completedAfterPreviewB, null, 'new preview clears the completed record')
+  } finally { fx.cleanup() }
+})
+
+test('MAJOR: no completed record before any execution', async () => {
+  const fx = fixture()
+  try {
+    writeTest(fx, 'ok.test.mjs', PASSING_TEST)
+    const manager = newManager(fx)
+    assert.equal(manager.getCompletedVerification(), null, 'no completed record before execution')
+  } finally { fx.cleanup() }
+})
