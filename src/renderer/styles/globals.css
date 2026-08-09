@@ -269,3 +269,129 @@ html, body, #root {
   border-top: 1px solid var(--border-color);
   color: var(--text-tertiary);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   0.1.2-A — Design tokens
+   Calm precision workbench: graphite gray + indigo accent.
+   Light-professional primary visual, medium-high information density.
+
+   Contract consumed by shell components (Rail, TopBar, Inspector,
+   StatusBar, CommandPalette):
+     --nav-width / --topbar-height / --inspector-width / --statusbar-height
+     --surface / --surface-2 / --surface-3
+     --ink / --ink-2 / --ink-3
+     --line / --line-strong
+     --indigo / --indigo-2 / --indigo-soft
+     --verified(-soft) / --failed(-soft) / --warn(-soft)
+     --radius
+     --control-h / --space  (density-driven control metrics)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Base tokens — dark theme (default) ── */
+:root,
+[data-theme="dark"] {
+  /* Layout metrics */
+  --nav-width: 208px;
+  --topbar-height: 48px;
+  --inspector-width: 320px;
+  --statusbar-height: 30px;
+  --radius: 8px;
+
+  /* Density-driven control metrics (defaults = standard) */
+  --control-h: 34px;
+  --space: 6px;
+
+  /* Surfaces — aliased onto existing background tokens so existing
+     components keep working without being touched. */
+  --surface: var(--bg-secondary);
+  --surface-2: var(--bg-tertiary);
+  --surface-3: var(--bg-hover);
+
+  /* Ink — text aliases */
+  --ink: var(--text-primary);
+  --ink-2: var(--text-secondary);
+  --ink-3: var(--text-tertiary);
+
+  /* Lines / borders */
+  --line: var(--border-color);
+  --line-strong: var(--bg-hover);
+
+  /* Accent — indigo (aliases --accent so theme switch is automatic) */
+  --indigo: var(--accent);
+  --indigo-2: #a5b4fc;
+  --indigo-soft: rgba(99, 102, 241, 0.15);
+
+  /* Semantic status */
+  --verified: #34d399;
+  --verified-soft: rgba(52, 211, 153, 0.15);
+  --failed: #f87171;
+  --failed-soft: rgba(248, 113, 113, 0.15);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.15);
+}
+
+/* ── Light theme overrides ── */
+html[data-theme="light"] {
+  /* Layout metrics are density-driven; keep standard defaults here */
+  --nav-width: 208px;
+  --topbar-height: 48px;
+  --inspector-width: 320px;
+  --statusbar-height: 30px;
+  --radius: 8px;
+
+  --surface: var(--bg-secondary);
+  --surface-2: var(--bg-tertiary);
+  --surface-3: var(--bg-hover);
+
+  --ink: var(--text-primary);
+  --ink-2: var(--text-secondary);
+  --ink-3: var(--text-tertiary);
+
+  --line: var(--border-color);
+  --line-strong: var(--bg-hover);
+
+  --indigo: var(--accent);
+  --indigo-2: #6366f1;
+  --indigo-soft: rgba(79, 70, 229, 0.12);
+
+  --verified: #16a34a;
+  --verified-soft: rgba(22, 163, 74, 0.12);
+  --failed: #dc2626;
+  --failed-soft: rgba(220, 38, 38, 0.10);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.12);
+}
+
+/* ── Density — overrides spacing / widths / control sizes ── */
+html[data-density="compact"] {
+  --nav-width: 190px;
+  --topbar-height: 40px;
+  --inspector-width: 300px;
+  --statusbar-height: 26px;
+  --control-h: 30px;
+  --space: 4px;
+}
+html[data-density="standard"] {
+  --nav-width: 208px;
+  --topbar-height: 48px;
+  --inspector-width: 320px;
+  --statusbar-height: 30px;
+  --control-h: 34px;
+  --space: 6px;
+}
+html[data-density="comfortable"] {
+  --nav-width: 224px;
+  --topbar-height: 52px;
+  --inspector-width: 352px;
+  --statusbar-height: 34px;
+  --control-h: 38px;
+  --space: 8px;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

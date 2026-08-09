@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { DiagnosticReport } from '../../../shared/ipc-types'
 import { useLocale } from '../../contexts/LocaleContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useDensity } from '../../contexts/DensityContext'
 import DiagnosticsPanel from './DiagnosticsPanel'
 
 function formatElapsed(ms: number): string {
@@ -33,6 +34,7 @@ const PROVIDERS = [
 export default function SettingsEditor() {
   const { t, locale, setLocale } = useLocale()
   const { theme, setTheme } = useTheme()
+  const { density, setDensity } = useDensity()
   const [activeSection, setActiveSection] = useState<Section>('api')
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null)
   const [checking, setChecking] = useState(false)
@@ -654,6 +656,22 @@ export default function SettingsEditor() {
                 <div className="text-lg mb-1">☀️</div>
                 <div className="font-medium">{t('settings.light')}</div>
               </button>
+            </div>
+
+            {/* Density */}
+            <div className="mt-5">
+              <div style={labelStyle}>{t('settings.density')}</div>
+              <div className="flex gap-3">
+                {(['compact', 'standard', 'comfortable'] as const).map(d => (
+                  <button key={d} onClick={() => setDensity(d)}
+                    className="flex-1 p-4 rounded-lg border text-xs transition-colors"
+                    style={{ background: density === d ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                      borderColor: density === d ? 'var(--accent)' : 'var(--border-color)', color: 'var(--text-primary)' }}>
+                    <div className="text-lg mb-1">{d === 'compact' ? '▬' : d === 'standard' ? '▬▬' : '▬▬▬'}</div>
+                    <div className="font-medium">{t(`settings.density${d.charAt(0).toUpperCase() + d.slice(1)}`)}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
