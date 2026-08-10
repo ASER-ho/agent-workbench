@@ -37,29 +37,37 @@ function runGit(cwd: string, args: string[]): void {
   execFileSync(git, args, { cwd, stdio: 'pipe', windowsHide: true })
 }
 
-function cvRegion() {
-  return page.getByRole('region', { name: '受控验证执行' })
+function workbench() {
+  return page.getByRole('region', { name: '只读验收' })
+}
+
+function reviewRegion() {
+  return page.getByRole('region', { name: '执行预览' })
+}
+
+function resultRegion() {
+  return page.getByRole('region', { name: '验证结果' })
 }
 
 async function fillContract(): Promise<void> {
-  const verification = page.getByRole('region', { name: '只读验收' })
+  const verification = workbench()
   await verification.getByLabel('任务标题').fill('受控验证 E2E')
   await verification.getByLabel('目标').fill('用固定 node --test 命令确认测试通过。')
   await verification.getByLabel('允许路径').fill('src\ntest')
   await verification.getByLabel('禁止路径').fill('.git')
-  await verification.getByLabel('验收标准').fill('测试通过')
-  await verification.getByLabel('已知风险').fill('仅运行固定测试命令')
+  await verification.getByRole('group', { name: '验收标准' }).getByLabel('验收标准 1').fill('测试通过')
+  await verification.getByRole('group', { name: '已知风险' }).getByLabel('已知风险 1').fill('仅运行固定测试命令')
+  await verification.getByLabel('验证方法').fill('test/example.test.mjs')
 }
 
-async function generatePreview(): Promise<void> {
-  await page.getByLabel('测试文件相对路径').fill('test/example.test.mjs')
-  await page.getByRole('button', { name: '生成验证预览' }).click()
-  const region = cvRegion()
-  await expect(region.getByText('固定命令')).toBeVisible()
-  await expect(region.getByText('node --test test/example.test.mjs')).toBeVisible()
-  await expect(region.getByText('30s', { exact: true })).toBeVisible()
-  await expect(region.getByText('PROCESS_BOUNDARY_ONLY')).toBeVisible()
-  await expect(region.getByText('ALLOWLISTED_ENVIRONMENT')).toBeVisible()
+async function enterReview(): Promise<void> {
+  await page.getByRole('button', { name: '确认并继续' }).click()
+  const review = reviewRegion()
+  await expect(review.getByText('固定命令', { exact: true })).toBeVisible()
+  await expect(review.getByText('node --test test/example.test.mjs')).toBeVisible()
+  await expect(review.getByText('30s', { exact: true })).toBeVisible()
+  await expect(review.getByText('PROCESS_BOUNDARY_ONLY', { exact: true })).toBeVisible()
+  await expect(review.getByText('ALLOWLISTED_ENVIRONMENT', { exact: true })).toBeVisible()
 }
 
 test.beforeEach(async () => {
@@ -110,49 +118,49 @@ test('controlled verification preview and one-time confirm run a passing test an
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
   await fillContract()
 
-  // Step 1: inspect current changes
-  await page.getByRole('button', { name: '检查当前修改' }).click()
-  await expect(page.getByText('范围检查：合规')).toBeVisible()
+  // DEFINE -> REVIEW shows the scope inspection and the immutable execution preview.
+  await enterReview()
+  const review = reviewRegion()
+  await expect(review.getByText('范围检查：合规')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
 
-  // Step 2-4: generate and review the immutable preview
-  await generatePreview()
-
-  // Step 5-6: confirm once and execute
-  const region = cvRegion()
+  // VERIFY: confirm once and execute.
   await page.getByRole('button', { name: '一次确认并执行' }).click()
-  await expect(region.getByText('已验证')).toBeVisible()
-  await expect(region.getByText('通过', { exact: true })).toBeVisible()
-  await expect(region.getByText('Subject 前后一致')).toBeVisible()
-  await expect(region.getByText('证据有效')).toBeVisible()
-  await expect(region.getByText('证据新鲜')).toBeVisible()
+
+  // RESULT: real ControlledVerificationResult.
+  const result = resultRegion()
+  await expect(result.getByText('已验证').first()).toBeVisible()
+  await expect(result.getByText('通过', { exact: true })).toBeVisible()
+  await expect(result.getByText('Subject 前后一致')).toBeVisible()
+  await expect(result.getByText('证据有效')).toBeVisible()
+  await expect(result.getByText('证据新鲜')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
   await page.screenshot({ path: testInfo.outputPath('controlled-verification-pass.png'), fullPage: true })
 })
 
-test('a failing test maps to FAIL and FAILED acceptance verdict', async ({}) => {
+test('a failing test maps to FAIL and FAILED acceptance verdict', async () => {
   writeFileSync(join(workspace, 'test', 'failing.test.mjs'), FAILING_TEST, 'utf8')
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
   await fillContract()
+  await workbench().getByLabel('验证方法').fill('test/failing.test.mjs')
 
-  await page.getByLabel('测试文件相对路径').fill('test/failing.test.mjs')
-  await page.getByRole('button', { name: '生成验证预览' }).click()
-  await expect(cvRegion().getByText('node --test test/failing.test.mjs')).toBeVisible()
+  await page.getByRole('button', { name: '确认并继续' }).click()
+  await expect(reviewRegion().getByText('node --test test/failing.test.mjs')).toBeVisible()
 
   await page.getByRole('button', { name: '一次确认并执行' }).click()
-  await expect(cvRegion().getByText('验收失败')).toBeVisible()
-  await expect(cvRegion().getByText('失败', { exact: true })).toBeVisible()
+  await expect(resultRegion().getByText('验收失败').first()).toBeVisible()
+  await expect(resultRegion().getByText('失败', { exact: true })).toBeVisible()
 })
 
-test('a code change after preview makes the confirmation stale', async ({}) => {
+test('a code change after preview makes the confirmation stale', async () => {
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
   await fillContract()
-  await generatePreview()
+  await enterReview()
 
   // Code changes after preview -> confirmation must be rejected as stale
   writeFileSync(join(workspace, 'src', 'late-change.txt'), 'late\n', 'utf8')
 
   await page.getByRole('button', { name: '一次确认并执行' }).click()
-  await expect(cvRegion().getByText('已拒绝')).toBeVisible()
-  await expect(cvRegion().getByText('代码或工作区已变化，确认失效，请重新生成预览。')).toBeVisible()
+  await expect(resultRegion().getByText('验证被拒绝')).toBeVisible()
+  await expect(resultRegion().getByText('代码或工作区已变化，确认失效。')).toBeVisible()
 })

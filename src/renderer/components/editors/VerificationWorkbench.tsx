@@ -1,13 +1,35 @@
+// Verification Workbench — 0.1.2-B Verification Production Workbench.
+//
+// Single user-visible main flow: DEFINE → REVIEW → VERIFY → RESULT.
+// Timeout / Cancelled / Subject Changed / Insufficient Evidence / rejected
+// confirmations are STATES of the RESULT stage, never navigation steps. No
+// eight-phase pipeline, no six-step stepper, no fake progress, no fabricated
+// evidence model.
+//
+// B owns DEFINE, REVIEW, VERIFY, and hands a real ControlledVerificationResult
+// to the RESULT stage. The RESULT stage is a MINIMAL real result display and is
+// the B→C handoff point: Agent C's ResultWorkbench replaces it at integration.
+//
+// This is the ONLY existing file changed by Agent B; AppShell mounts this default
+// export unchanged.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { VerificationContract, VerificationInspection } from '../../../shared/verification-types'
 import type {
   ControlledVerificationPreview,
   ControlledVerificationResult
 } from '../../../shared/controlled-verification-execution-types'
-import { useLocale } from '../../contexts/LocaleContext'
 import { createInspectionGuard, sameWorkspace } from './inspection-guard'
+import { useTr } from '../verification/verification-i18n'
+import { computeCompleteness, validateContract } from '../verification/verification-form'
+import ContractFormSection from '../verification/ContractFormSection'
+import ReviewSection from '../verification/ReviewSection'
+import VerifyRunningSection from '../verification/VerifyRunningSection'
+import ResultSection from '../verification/ResultSection'
+import { publishVerificationInspector } from '../verification/verification-inspector-bridge'
 
 type WorkspaceStatus = Awaited<ReturnType<typeof window.api.workspaceSelection.getStatus>>
+type FlowStage = 'define' | 'review' | 'verify' | 'result'
 
 const DEFAULT_CONTRACT: VerificationContract = {
   title: '',
@@ -18,51 +40,96 @@ const DEFAULT_CONTRACT: VerificationContract = {
   knownRisks: ['尚未运行功能验证命令']
 }
 
-function lines(value: string): string[] {
-  return value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)
+// Module-scoped draft so navigating away and back within the same session never
+// silently drops unsaved input. No persistent Draft backend.
+const draftStore: {
+  contract: VerificationContract
+  testPath: string
+  committedContract: VerificationContract
+  committedTestPath: string
+  dirty: boolean
+} = {
+  contract: { ...DEFAULT_CONTRACT },
+  testPath: 'test/example.test.mjs',
+  committedContract: { ...DEFAULT_CONTRACT },
+  committedTestPath: 'test/example.test.mjs',
+  dirty: false
 }
 
-function lineValue(value: string[]): string {
-  return value.join('\n')
+const stageMeta: Record<FlowStage, { labelZh: string; labelEn: string; subtitleZh: string; subtitleEn: string }> = {
+  define: {
+    labelZh: '定义合同',
+    labelEn: 'Define',
+    subtitleZh: '填写验证合同（目标、范围、验收标准、验证方法）。尚未运行功能验证命令；确认后生成执行预览。',
+    subtitleEn: 'Define the verification contract (goal, scope, criteria, method). No functional verification command has been run yet; confirming will generate an execution preview.'
+  },
+  review: {
+    labelZh: '执行预览',
+    labelEn: 'Review',
+    subtitleZh: '核对将验证什么与执行边界。下一步：一次确认后执行固定命令。',
+    subtitleEn: 'Review what will be verified and the execution boundary. Next: confirm once to run the fixed command.'
+  },
+  verify: {
+    labelZh: '验证执行',
+    labelEn: 'Verify',
+    subtitleZh: '正在执行受控验证。执行完成后自动显示真实结果。',
+    subtitleEn: 'Controlled verification is running. Real results appear as soon as execution finishes.'
+  },
+  result: {
+    labelZh: '结果',
+    labelEn: 'Result',
+    subtitleZh: '验证已完成。下一步：导出回执，或返回编辑合同。',
+    subtitleEn: 'Verification finished. Next: export the receipt, or return to the contract.'
+  }
 }
 
 export default function VerificationWorkbench() {
-  const { t } = useLocale()
+  const { tr } = useTr()
+  const [stage, setStage] = useState<FlowStage>('define')
+  const [contract, setContract] = useState<VerificationContract>(() => ({ ...draftStore.contract }))
+  const [testPath, setTestPath] = useState(draftStore.testPath)
+  const [committedContract, setCommittedContract] = useState<VerificationContract>(() => ({ ...draftStore.committedContract }))
+  const [committedTestPath, setCommittedTestPath] = useState(draftStore.committedTestPath)
+  const [dirty, setDirty] = useState(draftStore.dirty)
+  const [showErrors, setShowErrors] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [workspace, setWorkspace] = useState<WorkspaceStatus | null>(null)
-  const [contract, setContract] = useState(DEFAULT_CONTRACT)
-  const [result, setResult] = useState<VerificationInspection | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [testPath, setTestPath] = useState('test/example.test.mjs')
+  const [inspection, setInspection] = useState<VerificationInspection | null>(null)
+  const [inspectionError, setInspectionError] = useState('')
   const [preview, setPreview] = useState<ControlledVerificationPreview | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const [previewError, setPreviewError] = useState('')
   const [cvResult, setCvResult] = useState<ControlledVerificationResult | null>(null)
-  const [cvBusy, setCvBusy] = useState(false)
   const [cvError, setCvError] = useState('')
+  const [confirmBusy, setConfirmBusy] = useState(false)
   const [exportMsg, setExportMsg] = useState('')
+  const [elapsed, setElapsed] = useState(0)
   const guardRef = useRef(createInspectionGuard())
-  // 工作区身份以 ref 跟踪，比较在 updater 之外进行，避免 updater 内部副作用
   const workspaceRef = useRef<WorkspaceStatus | null>(null)
+  const timerRef = useRef<number | null>(null)
 
-  const invalidate = useCallback(() => {
+  const invalidateDerived = useCallback(() => {
     guardRef.current.invalidate()
-    setResult(null)
-    setBusy(false)
+    setInspection(null)
     setPreview(null)
     setCvResult(null)
+    setInspectionError('')
+    setPreviewError('')
     setCvError('')
-    setCvBusy(false)
+    setExportMsg('')
   }, [])
 
-  const setContractField = useCallback(<K extends keyof VerificationContract>(key: K, value: VerificationContract[K]) => {
-    invalidate()
-    setContract(current => ({ ...current, [key]: value }))
-  }, [invalidate])
-
+  // ── Workspace ─────────────────────────────────────────────────────
   const applyWorkspace = useCallback((status: WorkspaceStatus) => {
-    if (!sameWorkspace(workspaceRef.current, status)) invalidate()
+    if (!sameWorkspace(workspaceRef.current, status)) {
+      // Subject changed: a new workspace invalidates the current flow and returns
+      // to DEFINE with the draft preserved.
+      invalidateDerived()
+      setStage('define')
+    }
     workspaceRef.current = status
     setWorkspace(status)
-  }, [invalidate])
+  }, [invalidateDerived])
 
   useEffect(() => {
     let active = true
@@ -73,7 +140,7 @@ export default function VerificationWorkbench() {
         applyWorkspace(status)
       } catch {
         if (!active) return
-        invalidate()
+        invalidateDerived()
         setWorkspace(null)
       }
     }
@@ -92,78 +159,80 @@ export default function VerificationWorkbench() {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [applyWorkspace, invalidate])
+  }, [applyWorkspace, invalidateDerived])
 
-  const ready = useMemo(() => Boolean(
-    workspace?.selected && contract.title.trim() && contract.goal.trim() &&
-    contract.allowedPaths.length && contract.acceptanceCriteria.length && contract.knownRisks.length
-  ), [workspace, contract])
+  // ── Draft / dirty ─────────────────────────────────────────────────
+  const handleDraftChange = useCallback((next: VerificationContract, nextTestPath: string) => {
+    setContract(next)
+    setTestPath(nextTestPath)
+    draftStore.contract = { ...next }
+    draftStore.testPath = nextTestPath
+    draftStore.dirty = true
+    setDirty(true)
+    setShowErrors(false)
+    invalidateDerived()
+    setStage('define')
+  }, [invalidateDerived])
 
-  const previewReady = useMemo(() => Boolean(ready && testPath.trim()), [ready, testPath])
+  const handleCancelDefine = useCallback(() => {
+    if (dirty) setDiscardOpen(true)
+  }, [dirty])
 
-  const chooseWorkspace = async () => {
-    setError('')
-    setBusy(true)
-    try {
-      const response = await window.api.workspaceSelection.choose()
-      if (response.status.selected) applyWorkspace(response.status)
-    } catch {
-      setError(t('verification.workspaceFailed'))
-      setBusy(false)
-    }
-  }
+  const handleDiscardClose = useCallback(() => setDiscardOpen(false), [])
 
-  const inspect = async () => {
-    if (!ready) return
-    setError('')
-    let freshWorkspace: WorkspaceStatus | null = null
-    try {
-      freshWorkspace = await window.api.workspaceSelection.getStatus()
-    } catch {
-      invalidate()
-      setError(t('verification.workspaceFailed'))
-      return
-    }
-    if (!freshWorkspace?.selected || freshWorkspace.displayId !== workspaceRef.current?.displayId) {
-      applyWorkspace(freshWorkspace)
-      setError(t('verification.workspaceFailed'))
-      return
-    }
+  const handleDiscardConfirm = useCallback(() => {
+    setContract({ ...committedContract })
+    setTestPath(committedTestPath)
+    draftStore.contract = { ...committedContract }
+    draftStore.testPath = committedTestPath
+    draftStore.dirty = false
+    setDirty(false)
+    setDiscardOpen(false)
+    invalidateDerived()
+    setStage('define')
+    setShowErrors(false)
+  }, [committedContract, committedTestPath, invalidateDerived])
+
+  // ── REVIEW loading ────────────────────────────────────────────────
+  const loadReview = useCallback(async () => {
     const requestId = guardRef.current.begin()
-    setBusy(true)
-    try {
-      const next = await window.api.verification.inspect(contract)
-      if (!guardRef.current.shouldAccept(requestId)) return
-      setResult(next)
-    } catch {
-      if (guardRef.current.shouldAccept(requestId)) {
-        setError(t('verification.inspectFailed'))
-      }
-    } finally {
-      if (guardRef.current.shouldAccept(requestId)) {
-        setBusy(false)
-      }
-    }
-  }
-
-  const generatePreview = async () => {
-    if (!previewReady) return
+    setPreviewBusy(true)
+    setPreviewError('')
+    setInspectionError('')
+    setInspection(null)
+    setPreview(null)
     setCvError('')
+    setExportMsg('')
+
     let freshWorkspace: WorkspaceStatus | null = null
     try {
       freshWorkspace = await window.api.workspaceSelection.getStatus()
     } catch {
-      invalidate()
-      setCvError(t('verification.workspaceFailed'))
+      guardRef.current.invalidate()
+      setPreviewError(tr('无法选择项目，请重试。', 'Could not refresh the project. Try again.'))
+      setPreviewBusy(false)
       return
     }
     if (!freshWorkspace?.selected || freshWorkspace.displayId !== workspaceRef.current?.displayId) {
       applyWorkspace(freshWorkspace)
-      setCvError(t('verification.workspaceFailed'))
+      setPreviewError(tr('无法选择项目，请重试。', 'Could not refresh the project. Try again.'))
+      setPreviewBusy(false)
       return
     }
-    const requestId = guardRef.current.begin()
-    setCvBusy(true)
+
+    // Subject / observation (scope inspection) — best effort, independent of preview.
+    void (async () => {
+      try {
+        const next = await window.api.verification.inspect(contract)
+        if (guardRef.current.shouldAccept(requestId)) setInspection(next)
+      } catch {
+        if (guardRef.current.shouldAccept(requestId)) {
+          setInspectionError(tr('无法读取 Git 修改。请选择 Git 根目录并检查任务契约。', 'Could not read Git changes. Select the Git root and review the task contract.'))
+        }
+      }
+    })()
+
+    // Execution preview — real controlledVerification.preview IPC.
     try {
       const next = await window.api.controlledVerification.preview({ testPath: testPath.trim(), contract })
       if (!guardRef.current.shouldAccept(requestId)) return
@@ -172,336 +241,224 @@ export default function VerificationWorkbench() {
     } catch (err) {
       if (guardRef.current.shouldAccept(requestId)) {
         const message = err instanceof Error ? err.message : String(err)
-        setCvError(`${t('cv.previewFailed')} ${message}`)
+        setPreviewError(message)
       }
     } finally {
-      if (guardRef.current.shouldAccept(requestId)) {
-        setCvBusy(false)
-      }
+      if (guardRef.current.shouldAccept(requestId)) setPreviewBusy(false)
     }
-  }
+  }, [contract, testPath, tr, applyWorkspace])
 
-  const confirmExecute = async () => {
+  const handleContinueToReview = useCallback(async () => {
+    const errors = validateContract(contract, testPath)
+    const hasErrors = Object.keys(errors).length > 0
+    setShowErrors(true)
+    if (hasErrors) return
+    setCommittedContract({ ...contract })
+    setCommittedTestPath(testPath)
+    draftStore.committedContract = { ...contract }
+    draftStore.committedTestPath = testPath
+    draftStore.dirty = false
+    setDirty(false)
+    setStage('review')
+    await loadReview()
+  }, [contract, testPath, loadReview])
+
+  const handleBackToDefine = useCallback(() => {
+    setShowErrors(false)
+    setStage('define')
+  }, [])
+
+  const handleRegenerate = useCallback(async () => {
+    setCvResult(null)
+    setExportMsg('')
+    setStage('review')
+    await loadReview()
+  }, [loadReview])
+
+  // ── VERIFY running ────────────────────────────────────────────────
+  const stopTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  const startTimer = useCallback(() => {
+    stopTimer()
+    setElapsed(0)
+    timerRef.current = window.setInterval(() => setElapsed(value => value + 1), 1000)
+  }, [stopTimer])
+
+  useEffect(() => () => stopTimer(), [stopTimer])
+
+  const handleConfirmExecute = useCallback(async () => {
     if (!preview) return
-    setCvError('')
+    let freshWorkspace: WorkspaceStatus | null = null
+    try {
+      freshWorkspace = await window.api.workspaceSelection.getStatus()
+    } catch {
+      setPreviewError(tr('无法选择项目，请重试。', 'Could not refresh the project. Try again.'))
+      return
+    }
+    if (!freshWorkspace?.selected || freshWorkspace.displayId !== workspaceRef.current?.displayId) {
+      applyWorkspace(freshWorkspace)
+      setPreviewError(tr('无法选择项目，请重试。', 'Could not refresh the project. Try again.'))
+      return
+    }
     const requestId = guardRef.current.begin()
-    setCvBusy(true)
+    setConfirmBusy(true)
+    setCvError('')
+    setStage('verify')
+    setElapsed(0)
+    startTimer()
     try {
       const next = await window.api.controlledVerification.confirm(preview.confirmationId)
       if (!guardRef.current.shouldAccept(requestId)) return
       setCvResult(next)
-    } catch (err) {
+      setStage('result')
+    } catch {
       if (guardRef.current.shouldAccept(requestId)) {
-        const message = err instanceof Error ? err.message : String(err)
-        setCvError(`${t('cv.executionFailed')} ${message}`)
+        setCvError(tr('执行失败或已中断。', 'Execution failed or was interrupted.'))
+        setStage('review')
       }
     } finally {
       if (guardRef.current.shouldAccept(requestId)) {
-        setCvBusy(false)
+        setConfirmBusy(false)
+        stopTimer()
       }
     }
-  }
+  }, [preview, tr, applyWorkspace, startTimer, stopTimer])
 
-  const exportReceipt = async (kind: 'json' | 'md' | 'both') => {
-    if (!cvResult || cvResult.state !== 'executed') return
-    setExportMsg('')
-    try {
-      const outcome = await window.api.controlledVerification.exportReceipt(kind)
-      if (outcome.ok) {
-        setExportMsg(t('cv.exported'))
-      } else {
-        setExportMsg(`${t('cv.exportFailed')} ${outcome.error ?? ''}`)
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setExportMsg(`${t('cv.exportFailed')} ${message}`)
-    }
-  }
-
-  const cancelExecute = async () => {
+  const handleCancelExecute = useCallback(async () => {
     if (!preview) return
     try {
       await window.api.controlledVerification.cancel(preview.confirmationId)
     } catch {
       // best effort; the running command still settles on its own
     }
-  }
+  }, [preview])
 
-  const fieldClass = 'w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 outline-none focus:border-blue-500'
-
-  const commandStatusColor = (status: string): string => {
-    switch (status) {
-      case 'PASS': return 'text-emerald-300'
-      case 'FAIL': return 'text-red-300'
-      case 'TIMEOUT': return 'text-amber-300'
-      case 'CANCELLED': return 'text-gray-400'
-      case 'ERROR': return 'text-red-300'
-      default: return 'text-gray-300'
+  // ── Export (real IPC) ─────────────────────────────────────────────
+  const exportReceipt = useCallback(async (kind: 'json' | 'md' | 'both') => {
+    if (!cvResult || cvResult.state !== 'executed') return
+    setExportMsg('')
+    try {
+      const outcome = await window.api.controlledVerification.exportReceipt(kind)
+      if (outcome.ok) setExportMsg(tr('导出成功。', 'Export succeeded.'))
+      else setExportMsg(`${tr('导出失败：', 'Export failed: ')}${outcome.error ?? ''}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setExportMsg(`${tr('导出失败：', 'Export failed: ')}${message}`)
     }
-  }
+  }, [cvResult, tr])
+
+  // ── Derived ───────────────────────────────────────────────────────
+  const completeness = useMemo(() => computeCompleteness(contract, testPath), [contract, testPath])
+  const fieldErrors = useMemo(() => validateContract(contract, testPath), [contract, testPath])
+  const canContinue = completeness.goal && completeness.scope && completeness.criteria && completeness.method && completeness.risks
+  const stageMetaCurrent = stageMeta[stage]
+
+  // Publish inspector context for the integration agent.
+  useEffect(() => {
+    let context: 'contract' | 'subject' | 'execution' | 'running'
+    if (stage === 'verify') context = 'running'
+    else if (stage === 'review') context = preview ? 'execution' : 'subject'
+    else context = 'contract'
+    publishVerificationInspector({
+      context,
+      contract,
+      testPath,
+      workspace,
+      inspection,
+      preview,
+      previewBusy,
+      previewError,
+      executing: stage === 'verify',
+      elapsedSeconds: stage === 'verify' ? elapsed : undefined,
+      commandStatus: cvResult && cvResult.state === 'executed' ? cvResult.commandStatus : undefined
+    })
+  }, [stage, contract, testPath, workspace, inspection, preview, previewBusy, previewError, elapsed, cvResult])
 
   return (
-    <section className="w-full rounded-xl border border-gray-800 bg-gray-900/70 p-5 text-gray-300" aria-labelledby="verification-heading">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 id="verification-heading" className="text-lg font-semibold text-gray-100">{t('verification.title')}</h2>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500">{t('verification.subtitle')}</p>
-        </div>
-        <span className="rounded-full border border-emerald-800/70 bg-emerald-950/40 px-2 py-1 text-[10px] text-emerald-300">{t('verification.badge')}</span>
-      </div>
-
-      <div className="mb-4 rounded-lg border border-gray-800 bg-gray-950/60 p-3">
+    <section className="mx-auto w-full px-1 py-1" style={{ maxWidth: 880 }} aria-labelledby="verification-heading">
+      <header className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-gray-600">{t('verification.workspace')}</div>
-            <div className="truncate text-sm text-gray-300">{workspace?.selected ? workspace.displayName : t('verification.workspaceMissing')}</div>
-          </div>
-          <button type="button" onClick={chooseWorkspace} disabled={busy} className="rounded-md border border-gray-700 px-3 py-2 text-xs text-gray-300 hover:border-gray-500 disabled:opacity-50">
-            {busy ? t('verification.choosing') : t('verification.chooseWorkspace')}
-          </button>
+          <h1 id="verification-heading" className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>
+            {tr('只读验收', 'Read-only Verification')}
+          </h1>
+          <span className="shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium" style={{ borderColor: 'var(--line)', color: 'var(--text-tertiary)' }}>
+            {tr(`阶段：${stageMetaCurrent.labelZh}`, `Stage: ${stageMetaCurrent.labelEn}`)}
+          </span>
         </div>
-      </div>
+        <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+          {tr(stageMetaCurrent.subtitleZh, stageMetaCurrent.subtitleEn)}
+        </p>
+      </header>
 
-      <div className="grid gap-3">
-        <label className="grid gap-1 text-xs text-gray-500">
-          {t('verification.taskTitle')}
-          <input className={fieldClass} value={contract.title} onChange={event => setContractField('title', event.target.value)} />
-        </label>
-        <label className="grid gap-1 text-xs text-gray-500">
-          {t('verification.goal')}
-          <textarea className={fieldClass} rows={2} value={contract.goal} onChange={event => setContractField('goal', event.target.value)} />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs text-gray-500">
-            {t('verification.allowedPaths')}
-            <textarea className={fieldClass} rows={3} value={lineValue(contract.allowedPaths)} onChange={event => setContractField('allowedPaths', lines(event.target.value))} />
-          </label>
-          <label className="grid gap-1 text-xs text-gray-500">
-            {t('verification.forbiddenPaths')}
-            <textarea className={fieldClass} rows={3} value={lineValue(contract.forbiddenPaths)} onChange={event => setContractField('forbiddenPaths', lines(event.target.value))} />
-          </label>
-        </div>
-        <label className="grid gap-1 text-xs text-gray-500">
-          {t('verification.acceptanceCriteria')}
-          <textarea className={fieldClass} rows={2} value={lineValue(contract.acceptanceCriteria)} onChange={event => setContractField('acceptanceCriteria', lines(event.target.value))} />
-        </label>
-        <label className="grid gap-1 text-xs text-gray-500">
-          {t('verification.knownRisks')}
-          <textarea className={fieldClass} rows={2} value={lineValue(contract.knownRisks)} onChange={event => setContractField('knownRisks', lines(event.target.value))} />
-        </label>
-      </div>
-
-      {!cvResult && <p className="mt-3 text-xs text-amber-300/80">{t('verification.noCommand')}</p>}
-      {error && <p role="alert" className="mt-3 rounded-md border border-red-900/70 bg-red-950/40 p-3 text-xs text-red-300">{error}</p>}
-      <button type="button" onClick={inspect} disabled={!ready || busy} className="mt-4 w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
-        {busy ? t('verification.inspecting') : t('verification.inspect')}
-      </button>
-
-      {result && (
-        <div className="mt-5 space-y-4" aria-live="polite">
-          <div className={`rounded-lg border p-3 ${result.scopeCompliant ? 'border-emerald-800/70 bg-emerald-950/30' : 'border-amber-800/70 bg-amber-950/30'}`}>
-            <div className={`text-sm font-medium ${result.scopeCompliant ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {t(result.scopeCompliant ? 'verification.scopeCompliant' : 'verification.scopeProblem')}
-            </div>
-            <div className="mt-2 flex gap-4 text-xs text-gray-400">
-              <span>{t('verification.changedCount')}: {result.changedCount}</span>
-              <span>{t('verification.unexpectedCount')}: {result.unexpectedCount}</span>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">{t('verification.changedFiles')}</h3>
-            {result.changes.length === 0 ? (
-              <p className="text-xs text-gray-600">{t('verification.noChanges')}</p>
-            ) : (
-              <ul className="space-y-1">
-                {result.changes.map((change, index) => (
-                  <li key={`${change.path}-${index}`} className="flex items-center justify-between gap-3 rounded bg-gray-950/70 px-3 py-2 text-xs">
-                    <code className="min-w-0 truncate text-gray-300">{change.path}</code>
-                    <span className="shrink-0 text-gray-500">{t(`verification.class.${change.classification}`)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">{t('verification.receipt')}</h3>
-            <div className="space-y-2">
-              {result.receipt.sections.map(section => (
-                <div key={section.id} className="rounded-lg border border-gray-800 bg-gray-950/50 p-3">
-                  <div className="text-xs font-medium text-gray-300">{section.title}</div>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-500">{section.content}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      {stage === 'define' && (
+        <ContractFormSection
+          workspace={workspace}
+          contract={contract}
+          testPath={testPath}
+          dirty={dirty}
+          showErrors={showErrors}
+          fieldErrors={fieldErrors}
+          completeness={completeness}
+          canContinue={canContinue}
+          chooseBusy={false}
+          onChooseWorkspace={async () => {
+            try {
+              const response = await window.api.workspaceSelection.choose()
+              if (response.status.selected) applyWorkspace(response.status)
+            } catch {
+              setPreviewError(tr('无法选择项目，请重试。', 'Could not choose the project. Try again.'))
+            }
+          }}
+          onChange={handleDraftChange}
+          onCancel={handleCancelDefine}
+          onContinue={() => { void handleContinueToReview() }}
+          discardOpen={discardOpen}
+          onDiscardClose={handleDiscardClose}
+          onDiscardConfirm={handleDiscardConfirm}
+        />
       )}
 
-      {/* ── 受控验证执行（Task 7） ─────────────────────────────── */}
-      <div className="mt-6 rounded-lg border border-gray-800 bg-gray-950/60 p-4" role="region" aria-labelledby="cv-heading" aria-label={t('cv.title')}>
-        <h3 id="cv-heading" className="text-sm font-semibold text-gray-200">{t('cv.title')}</h3>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500">{t('cv.intro')}</p>
+      {stage === 'review' && (
+        <ReviewSection
+          workspace={workspace}
+          contract={contract}
+          testPath={testPath}
+          inspection={inspection}
+          inspectionError={inspectionError}
+          preview={preview}
+          previewBusy={previewBusy}
+          previewError={previewError}
+          confirmBusy={confirmBusy}
+          confirmError={cvError}
+          onBackToDefine={handleBackToDefine}
+          onRegenerate={() => { void handleRegenerate() }}
+          onConfirm={() => { void handleConfirmExecute() }}
+        />
+      )}
 
-        <div className="mt-3 grid gap-3">
-          <label className="grid gap-1 text-xs text-gray-500">
-            {t('cv.testPathLabel')}
-            <input
-              className={fieldClass}
-              aria-label={t('cv.testPathLabel')}
-              value={testPath}
-              placeholder={t('cv.testPathPlaceholder')}
-              onChange={event => {
-                setTestPath(event.target.value)
-                setPreview(null)
-                setCvResult(null)
-              }}
-            />
-          </label>
-        </div>
+      {stage === 'verify' && (
+        <VerifyRunningSection
+          testPath={testPath}
+          commandPreview={preview?.commandPreview ?? `node --test ${testPath}`}
+          elapsedSeconds={elapsed}
+          onCancel={() => { void handleCancelExecute() }}
+        />
+      )}
 
-        {!workspace?.selected && <p className="mt-3 text-xs text-gray-600">{t('cv.workspaceMissing')}</p>}
-        {cvError && <p role="alert" className="mt-3 rounded-md border border-red-900/70 bg-red-950/40 p-3 text-xs text-red-300">{cvError}</p>}
-
-        <button
-          type="button"
-          onClick={generatePreview}
-          disabled={!previewReady || cvBusy}
-          className="mt-3 w-full rounded-md border border-indigo-700 bg-indigo-950/40 px-4 py-2 text-sm font-medium text-indigo-200 hover:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {cvBusy && !preview ? t('cv.generating') : t('cv.generatePreview')}
-        </button>
-
-        {preview && (
-          <div className="mt-4 space-y-3" aria-live="polite">
-            <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
-              <div className="flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.command')}</span>
-                <code className="min-w-0 truncate text-gray-200">{preview.commandPreview}</code>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.timeout')}</span>
-                <span className="text-gray-300">{preview.timeoutMs / 1000}s</span>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.codeDigest')}</span>
-                <code className="min-w-0 max-w-[60%] truncate text-gray-300">{preview.subjectDigest}</code>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.isolation')}</span>
-                <span className="min-w-0 text-right text-gray-300">{preview.isolationLevels.join(', ')}</span>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.environmentProfile')}</span>
-                <code className="min-w-0 truncate text-gray-300">{preview.environmentProfile}</code>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.expiration')}</span>
-                <span className="min-w-0 text-right text-gray-300">{new Date(preview.expiration).toLocaleString()}</span>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3">
-                <span className="shrink-0 text-gray-500">{t('cv.previewHash')}</span>
-                <code className="min-w-0 max-w-[60%] truncate text-gray-400">{preview.previewHash}</code>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={confirmExecute}
-                disabled={cvBusy}
-                className="flex-1 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {cvBusy ? t('cv.confirming') : t('cv.confirmExecute')}
-              </button>
-              <button
-                type="button"
-                onClick={cancelExecute}
-                disabled={!cvBusy}
-                className="rounded-md border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:border-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {t('cv.cancel')}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {cvResult && (
-          <div className="mt-4 space-y-3" aria-live="polite">
-            {cvResult.state === 'rejected' ? (
-              <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3">
-                <div className="text-sm font-medium text-amber-300">{t('cv.rejected')}</div>
-                <p className="mt-1 text-xs leading-relaxed text-amber-200/80">{t(`cv.reason.${cvResult.reason}`)}</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{t('cv.status')}</span>
-                    <span className={commandStatusColor(cvResult.commandStatus)}>{t(`cv.status.${cvResult.commandStatus}`)}</span>
-                  </div>
-                  {cvResult.exitCode !== null && (
-                    <div className="mt-1.5 flex items-center justify-between gap-3">
-                      <span className="text-gray-500">{t('cv.exitCode')}</span>
-                      <span className="text-gray-300">{cvResult.exitCode}</span>
-                    </div>
-                  )}
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{cvResult.subjectStable ? t('cv.subjectStable') : t('cv.subjectChanged')}</span>
-                    <span className={cvResult.subjectStable ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.subjectStable ? '✓' : '✗'}</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{cvResult.evidence ? (cvResult.evidence.valid ? t('cv.evidenceValid') : t('cv.evidenceInvalid')) : '—'}</span>
-                    <span className={cvResult.evidence?.valid ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.evidence?.valid ? '✓' : '✗'}</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{cvResult.evidence ? (cvResult.evidence.fresh ? t('cv.evidenceFresh') : t('cv.evidenceStale')) : '—'}</span>
-                    <span className={cvResult.evidence?.fresh ? 'text-emerald-300' : 'text-amber-300'}>{cvResult.evidence?.fresh ? '✓' : '✗'}</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{t('cv.criterionVerdict')}</span>
-                    <span className={cvResult.criterion.verdict === 'VERIFIED' ? 'text-emerald-300' : cvResult.criterion.verdict === 'FAILED' ? 'text-red-300' : 'text-amber-300'}>
-                      {t(`cv.verdict.${cvResult.criterion.verdict}`)}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.stdout')}{cvResult.stdoutTruncated ? ` ${t('cv.truncated')}` : ''}</h4>
-                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-400 whitespace-pre-wrap break-all">{cvResult.stdout || '(empty)'}</pre>
-                </div>
-                <div>
-                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.stderr')}{cvResult.stderrTruncated ? ` ${t('cv.truncated')}` : ''}</h4>
-                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-400 whitespace-pre-wrap break-all">{cvResult.stderr || '(empty)'}</pre>
-                </div>
-                <div>
-                  <h4 className="mb-1 text-xs font-medium text-gray-500">{t('cv.decisionTrace')}</h4>
-                  <pre className="max-h-40 overflow-auto rounded bg-gray-950/70 p-2 text-[11px] leading-relaxed text-gray-500">{cvResult.criterion.decisionTrace.join('\n')}</pre>
-                </div>
-                <div className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-500">{t('cv.acceptanceDecision')}</span>
-                    <span className="text-gray-300">NOT_RECORDED</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => exportReceipt('json')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
-                      {t('cv.exportJson')}
-                    </button>
-                    <button type="button" onClick={() => exportReceipt('md')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
-                      {t('cv.exportMarkdown')}
-                    </button>
-                    <button type="button" onClick={() => exportReceipt('both')} className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
-                      {t('cv.exportBoth')}
-                    </button>
-                  </div>
-                  {exportMsg && <p className="mt-2 text-[11px] text-amber-300/80">{exportMsg}</p>}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {stage === 'result' && cvResult && (
+        <ResultSection
+          result={cvResult}
+          exportMsg={exportMsg}
+          onExport={exportReceipt}
+          onBackToDefine={handleBackToDefine}
+          onRegenerate={() => { void handleRegenerate() }}
+        />
+      )}
     </section>
   )
 }

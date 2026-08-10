@@ -38,26 +38,31 @@ function runGit(cwd: string, args: string[]): void {
   execFileSync(git, args, { cwd, stdio: 'pipe', windowsHide: true })
 }
 
-function cvRegion() {
-  return page.getByRole('region', { name: '受控验证执行' })
+function workbench() {
+  return page.getByRole('region', { name: '只读验收' })
 }
 
-async function fillContract(): Promise<void> {
-  const verification = page.getByRole('region', { name: '只读验收' })
+function resultRegion() {
+  return page.getByRole('region', { name: '验证结果' })
+}
+
+async function fillContract(testName: string): Promise<void> {
+  const verification = workbench()
   await verification.getByLabel('任务标题').fill('R2D 闭环验收')
   await verification.getByLabel('目标').fill('确认固定 node --test 通过并导出回执。')
   await verification.getByLabel('允许路径').fill('src\ntest')
   await verification.getByLabel('禁止路径').fill('.git')
-  await verification.getByLabel('验收标准').fill('测试通过并生成回执')
-  await verification.getByLabel('已知风险').fill('仅运行固定测试命令')
+  await verification.getByRole('group', { name: '验收标准' }).getByLabel('验收标准 1').fill('测试通过并生成回执')
+  await verification.getByRole('group', { name: '已知风险' }).getByLabel('已知风险 1').fill('仅运行固定测试命令')
+  await verification.getByLabel('验证方法').fill(testName)
 }
 
 async function runToResult(testName: string): Promise<void> {
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
-  await fillContract()
-  await page.getByLabel('测试文件相对路径').fill(testName)
-  await page.getByRole('button', { name: '生成验证预览' }).click()
-  await expect(cvRegion().getByText('固定命令')).toBeVisible()
+  await fillContract(testName)
+  await page.getByRole('button', { name: '确认并继续' }).click()
+  const review = page.getByRole('region', { name: '执行预览' })
+  await expect(review.getByText('固定命令', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '一次确认并执行' }).click()
 }
 
@@ -109,11 +114,11 @@ test.afterEach(async () => {
 test('R2D: passing test produces a verifiable JSON Receipt and Markdown Handoff', async () => {
   writeFileSync(join(workspace, 'test', 'example.test.mjs'), PASSING_TEST, 'utf8')
   await runToResult('test/example.test.mjs')
-  await expect(cvRegion().getByText('已验证')).toBeVisible()
+  await expect(resultRegion().getByText('已验证').first()).toBeVisible()
 
   // Export both JSON and Markdown.
-  await cvRegion().getByRole('button', { name: '导出两者' }).click()
-  await expect(cvRegion().getByText('导出成功。')).toBeVisible()
+  await resultRegion().getByRole('button', { name: '导出两者' }).click()
+  await expect(resultRegion().getByText('导出成功。')).toBeVisible()
 
   const jsonPath = join(exportDir, 'verification-receipt.json')
   const mdPath = join(exportDir, 'verification-handoff.md')
@@ -153,10 +158,10 @@ test('R2D: passing test produces a verifiable JSON Receipt and Markdown Handoff'
 test('R2D: a failing test still exports a non-VERIFIED Receipt', async () => {
   writeFileSync(join(workspace, 'test', 'failing.test.mjs'), FAILING_TEST, 'utf8')
   await runToResult('test/failing.test.mjs')
-  await expect(cvRegion().getByText('验收失败')).toBeVisible()
+  await expect(resultRegion().getByText('验收失败').first()).toBeVisible()
 
-  await cvRegion().getByRole('button', { name: '导出 JSON Receipt' }).click()
-  await expect(cvRegion().getByText('导出成功。')).toBeVisible()
+  await resultRegion().getByRole('button', { name: '导出 JSON Receipt' }).click()
+  await expect(resultRegion().getByText('导出成功。')).toBeVisible()
 
   const jsonPath = join(exportDir, 'verification-receipt.json')
   expect(existsSync(jsonPath)).toBe(true)

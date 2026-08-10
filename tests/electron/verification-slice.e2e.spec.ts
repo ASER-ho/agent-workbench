@@ -58,6 +58,23 @@ function runGit(cwd: string, args: string[]): void {
   execFileSync(git, args, { cwd, stdio: 'pipe', windowsHide: true })
 }
 
+function workbench() {
+  return page.getByRole('region', { name: '只读验收' })
+}
+
+async function fillContract(): Promise<void> {
+  const verification = workbench()
+  await verification.getByLabel('任务标题').fill('检查当前修改')
+  await verification.getByLabel('目标').fill('确认改动范围，功能正确性留待后续验证。')
+  await verification.getByLabel('允许路径').fill('src')
+  await verification.getByLabel('禁止路径').fill('.git')
+  await verification.getByRole('group', { name: '验收标准' }).getByLabel('验收标准 1').fill('所有改动路径都被分类')
+  await verification.getByRole('group', { name: '已知风险' }).getByLabel('已知风险 1').fill('尚未运行验证命令')
+  // 验证方法 uses the default (test/example.test.mjs). The fixture has no test file,
+  // so the execution preview honestly reports it cannot execute; the scope
+  // inspection (Subject/Observation) still runs — that is what this spec asserts.
+}
+
 test.beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'aw-r2a1-electron-'))
   git = findGit()
@@ -106,34 +123,32 @@ test.afterEach(async () => {
 
 test('Welcome verification flow classifies allowed then outside-scope changes without Agent or raw path exposure', async ({}, testInfo) => {
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
-  const verification = page.getByRole('region', { name: '只读验收' })
-  await verification.getByLabel('任务标题').fill('检查当前修改')
-  await verification.getByLabel('目标').fill('确认改动范围，功能正确性留待后续验证。')
-  await verification.getByLabel('允许路径').fill('src')
-  await verification.getByLabel('禁止路径').fill('.git')
-  await verification.getByLabel('验收标准').fill('所有改动路径都被分类')
-  await verification.getByLabel('已知风险').fill('尚未运行验证命令')
+  await fillContract()
 
   // F5: 清空启动期记录，再执行 verification 流程
   await clearIpcRecorder()
 
-  await verification.getByRole('button', { name: '检查当前修改' }).click()
-  await expect(verification.getByText('范围检查：合规')).toBeVisible()
-  await expect(verification.getByText('还不能确认任务已经完成')).toBeVisible()
-  await expect(verification.getByText('只检查 Git 修改范围；尚未运行功能验证命令。', { exact: true })).toBeVisible()
+  // DEFINE -> REVIEW runs the scope inspection (Subject/Observation) automatically.
+  await page.getByRole('button', { name: '确认并继续' }).click()
+  const review = page.getByRole('region', { name: '执行预览' })
+  await expect(review.getByText('范围检查：合规')).toBeVisible()
+  await expect(review.getByText('还不能确认任务已经完成')).toBeVisible()
+  await expect(review.getByText('尚未运行功能验证命令')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
 
-  // F4: 修改允许路径后旧结果立即消失
-  await verification.getByLabel('允许路径').fill('docs')
-  await expect(verification.getByText('范围检查：合规')).not.toBeVisible()
+  // F4: 编辑允许路径后旧结果立即失效（回到编辑态后不再显示旧的合规结果）。
+  await review.getByRole('button', { name: '返回编辑合同' }).click()
+  await workbench().getByLabel('允许路径').fill('docs')
+  await expect(page.getByText('范围检查：合规')).not.toBeVisible()
   // 恢复允许路径，保持后续流程语义不变
-  await verification.getByLabel('允许路径').fill('src')
+  await workbench().getByLabel('允许路径').fill('src')
 
   const workspace = join(root, 'workspace')
   writeFileSync(join(workspace, 'docs', 'outside.txt'), 'outside change\n', 'utf8')
-  await verification.getByRole('button', { name: '检查当前修改' }).click()
-  await expect(verification.getByText('范围检查：发现范围外修改')).toBeVisible()
-  await expect(verification.getByText('docs/outside.txt')).toBeVisible()
+  await page.getByRole('button', { name: '确认并继续' }).click()
+  const review2 = page.getByRole('region', { name: '执行预览' })
+  await expect(review2.getByText('范围检查：发现范围外修改')).toBeVisible()
+  await expect(review2.getByText('docs/outside.txt')).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
 
   // F5: verification 流程期间不得触发 Session/Terminal/Action IPC
