@@ -193,8 +193,8 @@ export default function WorkspaceDesk({
               </div>
             </div>
 
-            {/* Project identity card */}
-            <section className="rounded-xl border p-5" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+            {/* Project identity section */}
+            <section className="border-t py-5" style={{ borderColor: 'var(--border-color)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
                 {tr('项目', 'Project')}
               </div>
@@ -228,7 +228,7 @@ export default function WorkspaceDesk({
 
             {/* Environment + readiness grid */}
             <div className="grid gap-4 md:grid-cols-2">
-              <section className="rounded-xl border p-5" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <section className="border-t py-5" style={{ borderColor: 'var(--border-color)' }}>
                 <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {tr('环境', 'Environment')}
                 </h2>
@@ -246,7 +246,7 @@ export default function WorkspaceDesk({
                 </dl>
               </section>
 
-              <section className="rounded-xl border p-5" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+              <section className="border-t py-5" style={{ borderColor: 'var(--border-color)' }}>
                 <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {tr('验证就绪', 'Verification Readiness')}
                 </h2>

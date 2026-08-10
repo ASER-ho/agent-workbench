@@ -77,7 +77,7 @@ export default function TechnicalDetails({ result, locale, receipt }: TechnicalD
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, 'Subject Before', 'Subject before')}</dt>
+          <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, '验证前 Subject', 'Subject before')}</dt>
           <dd className="min-w-0">
             <code className="block text-right text-[11px]" style={{ color: 'var(--text-secondary)', wordBreak: 'break-all' }} title={result.subjectBeforeDigest}>
               {truncateMiddle(result.subjectBeforeDigest, 24, 10)}
@@ -86,7 +86,7 @@ export default function TechnicalDetails({ result, locale, receipt }: TechnicalD
         </div>
         {result.subjectAfterDigest && (
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, 'Subject After', 'Subject after')}</dt>
+            <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, '验证后 Subject', 'Subject after')}</dt>
             <dd className="min-w-0">
               <code className="block text-right text-[11px]" style={{ color: 'var(--text-secondary)', wordBreak: 'break-all' }} title={result.subjectAfterDigest}>
                 {truncateMiddle(result.subjectAfterDigest, 24, 10)}

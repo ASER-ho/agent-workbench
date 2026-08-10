@@ -181,7 +181,7 @@ test('VERIFIED: renders verdict, explanation, next action, ledger, receipt, NOT_
   assert.ok(html.includes('总体判定'), 'verdict section present')
   assert.ok(html.includes('下一步'), 'next action present')
   assert.ok(html.includes('测试命令通过'), 'explanation present')
-  assert.ok(html.includes('Criterion 判定'), 'criterion ledger present')
+  assert.ok(html.includes('条件判定'), 'criterion ledger present')
   assert.ok(html.includes(C), 'criterion id present')
   assert.ok(html.includes('证据台账'), 'evidence ledger present')
   assert.ok(html.includes(EVID), 'evidence id present')

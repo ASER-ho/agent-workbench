@@ -73,7 +73,7 @@ function CriterionDetail({ result, criterionId, locale, receipt }: {
     <div className="space-y-3">
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-          {tr(locale, 'Criterion', 'Criterion')}
+          {tr(locale, '条件', 'Criterion')}
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
           <code className="text-sm" style={{ color: 'var(--text-primary)' }}>{criterion.criterionId}</code>
@@ -156,7 +156,7 @@ function EvidenceDetail({ result, evidenceId, locale, receipt }: {
 
       <dl className="space-y-1.5 text-xs">
         <div className="flex items-baseline justify-between gap-2">
-          <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, 'Criterion', 'Criterion')}</dt>
+          <dt className="shrink-0" style={{ color: 'var(--text-tertiary)' }}>{tr(locale, '条件', 'Criterion')}</dt>
           <dd className="min-w-0"><code className="text-[11px]">{evidence.criterionId}</code></dd>
         </div>
         <div className="flex items-baseline justify-between gap-2">
@@ -302,7 +302,7 @@ export default function ResultInspectorContent({
   const selectedCriterion = criterionRows.find(c => c.criterionId === selectedCriterionId) ?? null
 
   return (
-    <div className="space-y-3" aria-label={tr(locale, 'Result 详情', 'Result details')}>
+    <div className="space-y-3" aria-label={tr(locale, '结果详情', 'Result details')}>
       {selectedEvidence
         ? <EvidenceDetail result={result} evidenceId={selectedEvidence.evidenceId} locale={locale} receipt={receipt} />
         : selectedCriterion

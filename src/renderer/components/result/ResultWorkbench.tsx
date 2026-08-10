@@ -49,7 +49,7 @@ export default function ResultWorkbench({
   if (result.state === 'executed') {
     changeItems.push({
       id: 'subject-before',
-      label: { zh: 'Subject Before', en: 'Subject before' },
+      label: { zh: '验证前 Subject', en: 'Subject before' },
       value: result.subjectBeforeDigest,
       title: result.subjectBeforeDigest,
       tone: 'muted'
@@ -57,7 +57,7 @@ export default function ResultWorkbench({
     if (result.subjectAfterDigest) {
       changeItems.push({
         id: 'subject-after',
-        label: { zh: 'Subject After', en: 'Subject after' },
+        label: { zh: '验证后 Subject', en: 'Subject after' },
         value: result.subjectAfterDigest,
         title: result.subjectAfterDigest,
         tone: result.subjectStable ? 'ok' : 'warn'

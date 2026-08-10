@@ -33,9 +33,9 @@ export default function CriterionLedger({
 }: CriterionLedgerProps) {
   if (rows.length === 0) {
     return (
-      <section aria-label={tr(locale, 'Criterion 台账', 'Criterion ledger')}>
+      <section aria-label={tr(locale, '条件台账', 'Criterion ledger')}>
         <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-          {tr(locale, 'Criterion 判定', 'Criterion outcomes')}
+          {tr(locale, '条件判定', 'Criterion outcomes')}
         </h3>
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {tr(locale, '没有可用的 Criterion 结果。', 'No criterion results available.')}
@@ -45,16 +45,16 @@ export default function CriterionLedger({
   }
 
   return (
-    <section aria-label={tr(locale, 'Criterion 台账', 'Criterion ledger')}>
+    <section aria-label={tr(locale, '条件台账', 'Criterion ledger')}>
       <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-        {tr(locale, 'Criterion 判定', 'Criterion outcomes')}
+        {tr(locale, '条件判定', 'Criterion outcomes')}
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] border-collapse text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
               <th className="py-1.5 pr-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-                {tr(locale, 'Criterion', 'Criterion')}
+                {tr(locale, '条件', 'Criterion')}
               </th>
               <th className="py-1.5 pr-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
                 {tr(locale, '证据', 'Evidence')}

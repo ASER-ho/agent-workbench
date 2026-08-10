@@ -36,8 +36,27 @@ function useMediaQuery(query: string): boolean {
  * Git / Verification readiness / Execution boundary; agent-specific detector
  * appears only as an advanced diagnostic item (never a top-level setting).
  */
+/** Real, per-item "what to check next" hints for failed diagnostics (renderer-only, no auto-repair). */
+function diagnosticsNextSteps(report: DiagnosticReport, locale: 'zh' | 'en'): { id: string; hint: string }[] {
+  const tr = (zh: string, en: string) => (locale === 'zh' ? zh : en)
+  const out: { id: string; hint: string }[] = []
+  for (const item of report.items) {
+    if (item.status !== 'error') continue
+    const id = item.id
+    let hint: string
+    if (id === 'node-path' || id === 'node-version' || id.startsWith('node-')) hint = tr('检查 Node.js 是否安装并可从 PATH 访问', 'Check that Node.js is installed and reachable from PATH')
+    else if (id === 'npm-path' || id === 'npm-version' || id.startsWith('npm')) hint = tr('检查 npm 是否安装并可用', 'Check that npm is installed and usable')
+    else if (id.startsWith('git')) hint = tr('检查 Git 是否安装并可访问', 'Check that Git is installed and reachable')
+    else if (id.startsWith('claude')) hint = tr('（可选）检测 Claude CLI；不影响验证', '(Optional) Claude CLI detection; does not affect verification')
+    else hint = tr('检查该项配置后重新检测', 'Check this configuration and re-run detection')
+    out.push({ id, hint })
+  }
+  return out
+}
+
 function EnvironmentView() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const tr = (zh: string, en: string) => (locale === 'zh' ? zh : en)
   const tRef = useRef(t)
   useEffect(() => { tRef.current = t }, [t])
   const [report, setReport] = useState<DiagnosticReport | null>(null)
@@ -63,10 +82,27 @@ function EnvironmentView() {
 
   useEffect(() => { void run() }, [run])
 
+  const nextSteps = report ? diagnosticsNextSteps(report, locale) : []
+
   return (
     <div className="h-full overflow-y-auto px-6 py-6">
       <div className="mx-auto w-full max-w-[1100px] space-y-6">
         <ReadyCheckPanel />
+        {nextSteps.length > 0 && (
+          <div
+            className="rounded-md border p-3 text-xs"
+            style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}
+          >
+            <div className="font-semibold" style={{ color: 'var(--warn)' }}>
+              {tr('下一步检查', 'What to check next')}
+            </div>
+            <ul className="mt-1.5 space-y-1" style={{ color: 'var(--text-secondary)' }}>
+              {nextSteps.map(s => (
+                <li key={s.id}>• {s.id}：{s.hint}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <DiagnosticsPanel report={report} loading={loading} error={error} onRun={run} />
       </div>
     </div>

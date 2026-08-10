@@ -80,7 +80,7 @@ test.afterEach(async () => {
 })
 
 async function criterionRows() {
-  return resultRegion().getByRole('region', { name: 'Criterion 台账' }).locator('tbody tr')
+  return resultRegion().getByRole('region', { name: '条件台账' }).locator('tbody tr')
 }
 async function evidenceRows() {
   return resultRegion().getByRole('region', { name: '证据台账' }).locator('tbody tr')

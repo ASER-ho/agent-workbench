@@ -63,7 +63,7 @@ export default function EvidenceLedger({
                   {tr(locale, '证据', 'Evidence')}
                 </th>
                 <th className="py-1.5 pr-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-                  {tr(locale, 'Criterion', 'Criterion')}
+                  {tr(locale, '条件', 'Criterion')}
                 </th>
                 <th className="py-1.5 pr-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
                   {tr(locale, '新鲜度', 'Fresh')}
