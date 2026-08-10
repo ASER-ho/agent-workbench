@@ -18,6 +18,7 @@ out/
 dist/
 dist-0.1.1-alpha/
 dist-0.1.1/
+dist-0.1.2/
 build/
 .cache/
 .vite/
