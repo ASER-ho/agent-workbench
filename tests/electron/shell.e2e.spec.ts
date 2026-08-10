@@ -28,7 +28,7 @@ test.beforeEach(async () => {
   git = findGit()
   workspace = join(root, 'workspace')
   const exportDir = join(root, 'exports')
-  for (const dir of ['src', 'test', 'docs', '.claude']) mkdirSync(join(workspace, dir), { recursive: true })
+  for (const dir of ['src', 'test', 'docs', '.claude', 'memory', 'skills', 'projects', 'config']) mkdirSync(join(workspace, dir), { recursive: true })
   for (const dir of ['settings', 'project', 'backups', 'exports', 'user-data', 'temp', 'app-data', 'local-app-data']) mkdirSync(join(root, dir), { recursive: true })
   writeFileSync(join(workspace, 'src', 'allowed.txt'), 'baseline\n', 'utf8')
   writeFileSync(join(root, 'settings', 'settings.json'), '{}\n', 'utf8')
@@ -113,6 +113,17 @@ test('rail navigates between workspace / verification / environment / settings v
   await expect(page.getByRole('button', { name: '编辑概览' })).toBeVisible()
 })
 
+test('workspace view restores the file-tree workspace browser entry points', async () => {
+  // The pre-shell Workspace Browser (Memory/Skills/Projects/Config) is mounted
+  // as a secondary panel in the Workspace view — entry points are not lost.
+  await expect(page.getByRole('heading', { name: '工作区' })).toBeVisible()
+  for (const label of ['记忆', '技能', '项目', '配置']) {
+    await expect(page.getByText(label).first()).toBeVisible()
+  }
+  // The browser's collapse toggle is present.
+  await expect(page.getByTitle('收起侧边栏')).toBeVisible()
+})
+
 test('inspector toggles closed and open from the topbar', async () => {
   const inspector = page.getByRole('complementary', { name: '详情' })
   await expect(inspector).toBeVisible()
@@ -150,13 +161,31 @@ test('command palette opens with Ctrl+K, runs a command, and closes with Escape'
   await expect(page.getByRole('dialog')).toBeHidden()
 })
 
-test('theme toggle switches data-theme dark -> light -> dark', async () => {
+test('theme defaults to light on first launch and toggles light -> dark -> light', async () => {
   const readTheme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'))
 
+  // First launch with a fresh user-data-dir (no persisted preference) boots Light.
+  await expect.poll(readTheme).toBe('light')
+  await page.getByTitle('切换主题').click()
   await expect.poll(readTheme).toBe('dark')
   await page.getByTitle('切换主题').click()
   await expect.poll(readTheme).toBe('light')
+})
+
+test('a persisted dark theme preference is honored and overrides the light default', async () => {
+  const readTheme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+
+  // Default is light on first launch.
+  await expect.poll(readTheme).toBe('light')
+
+  // Switch to dark, persist the preference, then reload.
   await page.getByTitle('切换主题').click()
+  await expect.poll(readTheme).toBe('dark')
+  await page.evaluate(() => localStorage.setItem('agent-workbench-theme', 'dark'))
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+
+  // The persisted preference wins over the light default.
   await expect.poll(readTheme).toBe('dark')
 })
 

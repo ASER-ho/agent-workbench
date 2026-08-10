@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouse
 import { useView } from '../../contexts/ViewContext'
 import { useTerminalLayout } from '../../contexts/TerminalLayoutContext'
 import { useLocale } from '../../contexts/LocaleContext'
+import { useSidebar } from '../../contexts/SidebarContext'
 import type { DiagnosticReport } from '../../../shared/ipc-types'
 import MainPanel from './MainPanel'
+import Sidebar from './Sidebar'
 import TerminalPanel from './TerminalPanel'
 import StatusBar from './StatusBar'
 import Rail from './Rail'
@@ -75,6 +77,7 @@ function EnvironmentView() {
 export default function AppShell() {
   const { currentView, inspectorOpen, setInspectorOpen } = useView()
   const { layout, maximized } = useTerminalLayout()
+  const { collapsed: sidebarCollapsed } = useSidebar()
   // Below ~1180px the Inspector becomes an overlay drawer instead of a column.
   const inspectorOverlay = useMediaQuery('(max-width: 1179px)')
   const [terminalHeight, setTerminalHeight] = useState(200)
@@ -113,8 +116,23 @@ export default function AppShell() {
         return <SettingsEditor />
       case 'workspace':
       default:
-        // Default view — the existing tabbed panel (TabBar + WelcomeTab).
-        return <MainPanel />
+        // Default view — the existing file-tree Workspace Browser (Sidebar,
+        // reusing the original component + WorkspaceContext data) beside the
+        // tabbed panel (TabBar + WelcomeTab). Restores the pre-shell entry
+        // points for Memory / Skills / Projects / Config.
+        return (
+          <div className="h-full flex overflow-hidden">
+            <div
+              className="flex-shrink-0 overflow-hidden"
+              style={{ width: sidebarCollapsed ? 48 : 260, borderRight: '1px solid var(--border-color)' }}
+            >
+              <Sidebar />
+            </div>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <MainPanel />
+            </div>
+          </div>
+        )
     }
   }
 

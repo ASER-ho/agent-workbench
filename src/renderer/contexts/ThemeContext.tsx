@@ -11,7 +11,10 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | null>(null)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark')
+  // Default is Light (frozen v8.1 design). A persisted user preference from
+  // `agent-workbench-theme` overrides this on mount; first launch (no saved
+  // preference) stays Light.
+  const [theme, setThemeState] = useState<Theme>('light')
 
   const applyTheme = useCallback((t: Theme) => {
     document.documentElement.classList.toggle('light', t === 'light')
@@ -41,7 +44,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return
       }
     } catch {}
-    applyTheme('dark')
+    applyTheme('light')
   }, [applyTheme])
 
   return (

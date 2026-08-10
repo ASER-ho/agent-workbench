@@ -12,7 +12,10 @@ let fixtureRoot = ''
 const fakeOpenAiKey = (suffix: string): string => ['sk', suffix].join('-')
 
 async function openSettings(): Promise<void> {
-  await page.getByRole('button', { name: /设置$/ }).click()
+  // Scope to the primary nav rail: the 0.1.2 shell adds a rail "设置" view item,
+  // and the workspace browser's own "⚙️ 设置" button would otherwise make an
+  // unscoped /设置$/ selector ambiguous.
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /设置$/ }).click()
   await expect(page.getByRole('heading', { name: 'API 配置' })).toBeVisible()
 }
 
