@@ -39,8 +39,17 @@ export default function Inspector({ overlay = false }: InspectorProps) {
   const renderBody = () => {
     if (currentView === 'verification') {
       // RESULT stage → Agent C's Result inspector (criterion / evidence / verdict).
+      // Selection is shared with the Result Workbench via the bridge, so the
+      // Inspector mirrors whichever Criterion / Evidence is selected there.
       if (inspector.context === 'result' && inspector.result) {
-        return <ResultInspectorContent result={inspector.result} locale={locale} />
+        return (
+          <ResultInspectorContent
+            result={inspector.result}
+            locale={locale}
+            selectedCriterionId={inspector.selectedCriterionId}
+            selectedEvidenceId={inspector.selectedEvidenceId}
+          />
+        )
       }
       // DEFINE / REVIEW / VERIFY → Agent B's Verification inspector.
       const verifContext = inspector.context === 'result' ? 'contract' : inspector.context

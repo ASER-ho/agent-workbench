@@ -277,3 +277,80 @@ test('cutover removes the legacy AI-session terminal and provider/agent settings
     expect(settingsBody, `unexpected legacy settings copy: ${forbidden}`).not.toContain(forbidden)
   }
 })
+
+async function resizeWindow(w: number, h: number): Promise<void> {
+  if (!app) throw new Error('no app')
+  await app.evaluate(({ BrowserWindow }, p) => {
+    const b = BrowserWindow.getAllWindows()[0]
+    if (b) b.setSize(p.w, p.h)
+  }, { w, h })
+  await page.waitForTimeout(500)
+}
+
+test('responsive: narrow windows (1100/1024) start with the Inspector closed and main accessible', async () => {
+  for (const w of [1100, 1024]) {
+    await resizeWindow(w, 700)
+    // Inspector closed by default on narrow widths — no overlay scrim blocks.
+    const inspector = page.getByRole('complementary', { name: '详情' })
+    await expect(inspector).toBeHidden()
+    // Rail + main are reachable (clicking the rail works, i.e. no scrim).
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '环境' }).click()
+    await expect(page.getByRole('heading', { name: '环境就绪检查' })).toBeVisible()
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '工作区' }).click()
+    await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
+  }
+})
+
+test('responsive: narrow manual open shows overlay + scrim; Escape and scrim close it', async () => {
+  await resizeWindow(1100, 700)
+  const inspector = page.getByRole('complementary', { name: '详情' })
+  await expect(inspector).toBeHidden()
+
+  // User opens the Inspector -> overlay + scrim appear.
+  await page.getByTitle('显示详情').click()
+  await expect(inspector).toBeVisible()
+
+  // Escape closes it.
+  await page.keyboard.press('Escape')
+  await expect(inspector).toBeHidden()
+
+  // Reopen, then click the scrim to close.
+  await page.getByTitle('显示详情').click()
+  await expect(inspector).toBeVisible()
+  await page.locator('body').click({ position: { x: 60, y: 200 } })
+  await expect(inspector).toBeHidden()
+
+  // Main is reachable again.
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '工作区' }).click()
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
+})
+
+test('responsive: 1280 -> 1100 safely closes a default-open Inspector (no blocking overlay)', async () => {
+  await resizeWindow(1280, 800)
+  const inspector = page.getByRole('complementary', { name: '详情' })
+  await expect(inspector).toBeVisible() // desktop default open
+
+  // Shrink into the narrow range: the merely-default Inspector must close so its
+  // scrim never blocks the Rail/Main.
+  await resizeWindow(1100, 700)
+  await expect(inspector).toBeHidden()
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '工作区' }).click()
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
+})
+
+test('responsive: 1100 -> 1280 restores the desktop Inspector without broken layout', async () => {
+  await resizeWindow(1100, 700)
+  const inspector = page.getByRole('complementary', { name: '详情' })
+  await expect(inspector).toBeHidden()
+
+  // Grow back to desktop: the default-open Inspector returns as a column, no scrim.
+  await resizeWindow(1280, 800)
+  await expect(inspector).toBeVisible()
+  const scrim = page.locator('[role="presentation"].absolute.inset-0')
+  await expect(scrim).toBeHidden()
+  // Layout is intact (no horizontal overflow).
+  const layout = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+  }))
+  expect(layout.overflow).toBe(false)
+})

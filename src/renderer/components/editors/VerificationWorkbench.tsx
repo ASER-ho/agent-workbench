@@ -103,6 +103,10 @@ export default function VerificationWorkbench() {
   const [cvError, setCvError] = useState('')
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [exportMsg, setExportMsg] = useState('')
+  // Result selection — drives the Criterion/Evidence ledger rows AND the
+  // Result Inspector (shared via the inspector bridge).
+  const [selectedCriterionId, setSelectedCriterionId] = useState<string | null>(null)
+  const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const guardRef = useRef(createInspectionGuard())
   const workspaceRef = useRef<WorkspaceStatus | null>(null)
@@ -377,9 +381,18 @@ export default function VerificationWorkbench() {
       executing: stage === 'verify',
       elapsedSeconds: stage === 'verify' ? elapsed : undefined,
       commandStatus: cvResult && cvResult.state === 'executed' ? cvResult.commandStatus : undefined,
-      result: cvResult
+      result: cvResult,
+      selectedCriterionId,
+      selectedEvidenceId
     })
-  }, [stage, contract, testPath, workspace, inspection, preview, previewBusy, previewError, elapsed, cvResult])
+  }, [stage, contract, testPath, workspace, inspection, preview, previewBusy, previewError, elapsed, cvResult, selectedCriterionId, selectedEvidenceId])
+
+  // A new result (or a return to DEFINE) clears the Result selection so the
+  // Inspector never points at a stale Criterion/Evidence.
+  useEffect(() => {
+    setSelectedCriterionId(null)
+    setSelectedEvidenceId(null)
+  }, [cvResult])
 
   return (
     <section className="mx-auto w-full px-1 py-1" style={{ maxWidth: 880 }} aria-labelledby="verification-heading">
@@ -458,6 +471,17 @@ export default function VerificationWorkbench() {
           <ResultWorkbench
             result={cvResult}
             locale={locale}
+            selectedCriterionId={selectedCriterionId}
+            selectedEvidenceId={selectedEvidenceId}
+            onSelectCriterion={(id) => {
+              // Mutually exclusive focus: picking a Criterion clears Evidence.
+              setSelectedCriterionId(id)
+              if (id) setSelectedEvidenceId(null)
+            }}
+            onSelectEvidence={(id) => {
+              setSelectedEvidenceId(id)
+              if (id) setSelectedCriterionId(null)
+            }}
             onExport={exportReceipt}
             exportPending={confirmBusy}
           />

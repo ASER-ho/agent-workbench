@@ -74,10 +74,25 @@ function EnvironmentView() {
 }
 
 export default function AppShell() {
-  const { currentView, inspectorOpen, setInspectorOpen } = useView()
+  const { currentView, inspectorOpen, setInspectorOpen, setInspectorOpenResponsive, inspectorUserToggled } = useView()
   // Below ~1180px the Inspector becomes an overlay drawer instead of a column.
   const inspectorOverlay = useMediaQuery('(max-width: 1179px)')
   const [projectFilesOpen, setProjectFilesOpen] = useState(false)
+
+  // Responsive Inspector default: on desktop the Inspector is open by default;
+  // crossing into the narrow (<1180px) range must safely close a merely-default
+  // open Inspector so its overlay scrim never blocks the Rail/Main. The user's
+  // explicit toggle wins and is preserved across the boundary. No duplicate
+  // Inspector state system — this reuses ViewContext's inspectorOpen.
+  const wasOverlayRef = useRef(inspectorOverlay)
+  useEffect(() => {
+    if (inspectorOverlay && !wasOverlayRef.current && !inspectorUserToggled) {
+      setInspectorOpenResponsive(false)
+    } else if (!inspectorOverlay && wasOverlayRef.current && !inspectorUserToggled) {
+      setInspectorOpenResponsive(true)
+    }
+    wasOverlayRef.current = inspectorOverlay
+  }, [inspectorOverlay, inspectorUserToggled, setInspectorOpenResponsive])
 
   const renderView = () => {
     switch (currentView) {

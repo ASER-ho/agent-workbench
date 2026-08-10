@@ -29,6 +29,9 @@ export interface VerificationInspectorSnapshot {
   commandStatus?: ControlledVerificationCommandStatus
   /** Present when the workbench is at the RESULT stage (drives the Result inspector). */
   result?: ControlledVerificationResult | null
+  /** Live Result selection — published so the Inspector mirrors the workbench. */
+  selectedCriterionId?: string | null
+  selectedEvidenceId?: string | null
 }
 
 type Listener = (snapshot: VerificationInspectorSnapshot) => void
