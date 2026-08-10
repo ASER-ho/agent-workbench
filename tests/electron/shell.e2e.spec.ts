@@ -125,6 +125,15 @@ test('workspace shows the Project Desk; Project Files opens the file browser on 
   }
   await expect(page.getByTitle('收起侧边栏')).toBeVisible()
 
+  // The Project Files drawer must not resurrect the legacy Provider/API surface:
+  // no API header, no connection status, no fabricated token estimates.
+  const drawer = page.getByRole('dialog', { name: '项目文件' })
+  await expect(drawer).toBeVisible()
+  const drawerBody = await drawer.innerText()
+  for (const forbidden of ['API', '已连接', '未配置密钥']) {
+    expect(drawerBody, `unexpected legacy API surface in Project Files: ${forbidden}`).not.toContain(forbidden)
+  }
+
   // Escape closes the drawer -> the browser is hidden again (no permanent sidebar).
   await page.keyboard.press('Escape')
   await expect(page.getByText('记忆').first()).toBeHidden()

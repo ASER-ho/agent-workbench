@@ -4,7 +4,6 @@ import { useTabs } from '../../contexts/TabContext'
 import { useLocale } from '../../contexts/LocaleContext'
 import { useSidebar } from '../../contexts/SidebarContext'
 import ContextMenu, { type ContextMenuItem } from '../common/ContextMenu'
-import ApiStatusWidget from '../common/ApiStatusWidget'
 
 const SECTION_ICONS: Record<string, string> = {
   Memory: '📝',
@@ -316,13 +315,7 @@ export default function Sidebar() {
       </div>
 
       {collapsed ? (
-        <div className="flex flex-col items-center gap-2 py-2 px-1">
-          <button onClick={() => { toggleCollapse(); openTab('__settings__', t('sidebar.settings'), 'settings', '⚙️') }}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors" title={t('sidebar.settings')}>
-            ⚙️
-          </button>
-          <ApiStatusWidget />
-        </div>
+        <div className="flex flex-col items-center gap-2 py-2 px-1" />
       ) : (
         <>
           <div className="flex-1 overflow-y-auto">
@@ -368,17 +361,6 @@ export default function Sidebar() {
                 )}
               </div>
             ))}
-          </div>
-
-          <ApiStatusWidget />
-
-          <div className="flex-shrink-0 border-t border-gray-800 px-2 py-2">
-            <button
-              onClick={() => openTab('__settings__', t('sidebar.settings'), 'settings', '⚙️')}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors">
-              <span>⚙️</span>
-              <span>{t('sidebar.settings')}</span>
-            </button>
           </div>
 
           {ctxMenu && (
