@@ -1,6 +1,6 @@
 {
   "name": "agent-workbench-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "description": "Independent local desktop workbench for AI coding agents",
   "main": "./out/main/index.js",
