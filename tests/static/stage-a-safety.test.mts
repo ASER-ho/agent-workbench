@@ -29,14 +29,20 @@ test('Stage A visible controls do not retain known hard-coded Chinese copy', () 
 })
 
 test('locale changes do not retrigger Project Capsule or readiness IPC loads', () => {
+  // All data-loading surfaces load once on mount (no `t`-dependence in the
+  // load callback), so a locale switch never retriggers IPC.
   for (const path of [
     'src/renderer/components/editors/ProjectCapsule.tsx',
     'src/renderer/components/editors/ReadyCheckPanel.tsx',
-    'src/renderer/components/editors/LaunchConfirmation.tsx'
+    'src/renderer/components/editors/LaunchConfirmation.tsx',
+    'src/renderer/components/views/WorkspaceDesk.tsx'
   ]) assert.doesNotMatch(read(path), /useCallback\([\s\S]*?\}, \[t\]\)/, `${path} reloads when locale changes`)
 
-  const settings = read('src/renderer/components/editors/SettingsEditor.tsx')
-  assert.match(settings, /diagInFlightRef\.current/)
+  // The workspace home (WorkspaceDesk) loads real data once; the Environment
+  // view (in AppShell) guards its diagnostics run with an in-flight ref so a
+  // locale switch never retriggers IPC.
+  const shell = read('src/renderer/components/layout/AppShell.tsx')
+  assert.match(shell, /inFlightRef\.current/)
 
   const terminal = read('src/renderer/components/layout/TerminalPanel.tsx')
   assert.doesNotMatch(terminal, /\}, \[t\]\)/, 'TerminalPanel reloads or recreates xterm when locale changes')
@@ -55,13 +61,17 @@ test('Stage A secret display uses one fixed mask and exposes no key fragments', 
 
 test('Stage A dynamic IPC messages are mapped to locale-owned copy', () => {
   const settings = read('src/renderer/components/editors/SettingsEditor.tsx')
+  // Removed surfaces (API / Provider / Share / Claude detection) must not resurface
+  // raw backend messages.
   assert.doesNotMatch(settings, /setTestResult\(r\.message\)/)
   assert.doesNotMatch(settings, /alert\(['"]Error:/)
   assert.doesNotMatch(settings, /providerSetResult\.message|packageResult\.error|packageResult\.securityScan\.message|String\(resetResult\.message\)/)
-  assert.match(settings, /settings\.apiConnectionSuccess/)
+  // Remaining dynamic-message surfaces use locale-owned copy, not raw backend text.
   assert.match(settings, /settings\.integrityCheckFailed/)
-  assert.match(settings, /settings\.detectFailed/)
-  assert.match(settings, /settings\.shareSecurityPassed/)
+  const shell = read('src/renderer/components/layout/AppShell.tsx')
+  assert.match(shell, /diag\.failed/)
+  const desk = read('src/renderer/components/views/WorkspaceDesk.tsx')
+  assert.doesNotMatch(desk, /\{error\}/, 'WorkspaceDesk must not render a raw backend error string')
 })
 
 test('Stage A capsule notes are sanitized before storage and on legacy load', () => {

@@ -100,85 +100,107 @@ test.afterEach(async () => {
   if (teardownError) throw teardownError
 })
 
+/**
+ * Start a running stub session through window.api.session.* IPC.
+ * 0.1.2 removed the Review & Launch button, the Confirm Stub Agent Launch
+ * dialog, and the ControlledActionPanel UI; the action backend requires a
+ * running session bound to the same workspace label.
+ */
 async function startSession(): Promise<void> {
-  await page.getByRole('button', { name: 'Review & Launch' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Confirm Stub Agent Launch' })
-  await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Confirm & Start' }).click()
-  await expect(page.getByText('Running', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Controlled Action' })).toBeVisible()
+  const plan = await page.evaluate(async () => {
+    return (window as any).api.session.prepareLaunch('fixture-project')
+  })
+  expect(plan.workspaceLabel).toBe('fixture-project')
+  const snapshot = await page.evaluate(async (confirmationId) => {
+    return (window as any).api.session.start(confirmationId)
+  }, plan.confirmationId)
+  expect(snapshot.status).toBe('running')
 }
 
 test('file proposal rejects without mutation then executes only after bound approval with evidence', async () => {
   await startSession()
   const target = join(fixtureRoot, 'workspace', 'stage-c', 'receipt-proof.txt')
 
-  await page.getByRole('button', { name: 'Review File Change' }).click()
-  let dialog = page.getByRole('dialog', { name: 'Review Controlled Action' })
-  await expect(dialog).toContainText('stage-c/receipt-proof.txt')
-  await expect(dialog).toContainText('+++ b/stage-c/receipt-proof.txt')
-  await dialog.getByRole('button', { name: 'Reject' }).click()
-  await expect(page.getByText('Rejected — not executed', { exact: false })).toBeVisible()
+  // Reject path: propose -> reject -> the target file must NOT be written.
+  const proposed = await page.evaluate(async () => {
+    return (window as any).api.action.propose({ actionType: 'file_change', workspaceLabel: 'fixture-project' })
+  })
+  expect(proposed.preview.kind).toBe('file_change')
+  expect(proposed.preview.relativePath).toBe('stage-c/receipt-proof.txt')
+  expect(proposed.preview.diff).toContain('+++ b/stage-c/receipt-proof.txt')
+  const rejectBinding = {
+    proposalId: proposed.proposalId,
+    proposalHash: proposed.proposalHash,
+    sessionId: proposed.sessionId,
+    workspaceId: proposed.workspaceId
+  }
+  const rejected = await page.evaluate(async (binding) => (window as any).api.action.reject(binding), rejectBinding)
+  expect(rejected.status).toBe('rejected')
   expect(existsSync(target)).toBe(false)
 
-  await page.getByRole('button', { name: 'Review File Change' }).click()
-  dialog = page.getByRole('dialog', { name: 'Review Controlled Action' })
-  await dialog.getByRole('button', { name: 'Approve' }).click()
-  await expect(page.getByText('Approved — not executed', { exact: false })).toBeVisible()
+  // Approve path: propose -> approve (approved-not-executed) -> execute writes the file.
+  const proposed2 = await page.evaluate(async () => {
+    return (window as any).api.action.propose({ actionType: 'file_change', workspaceLabel: 'fixture-project' })
+  })
+  const approveBinding = {
+    proposalId: proposed2.proposalId,
+    proposalHash: proposed2.proposalHash,
+    sessionId: proposed2.sessionId,
+    workspaceId: proposed2.workspaceId
+  }
+  const approved = await page.evaluate(async (binding) => (window as any).api.action.approve(binding), approveBinding)
+  expect(approved.approvalId).toBeTruthy()
   expect(existsSync(target)).toBe(false)
-  await page.getByRole('button', { name: 'Execute Approved' }).click()
-  await expect(page.getByText('Executed', { exact: false }).first()).toBeVisible()
+  const executed = await page.evaluate(async (approvalId) => (window as any).api.action.execute(approvalId), approved.approvalId)
+  expect(executed.receipt.status).toBe('executed')
   expect(readFileSync(target, 'utf8')).toBe('Agent Workbench controlled action\n')
 
-  await page.getByText('Markdown Handoff', { exact: true }).click()
-  await expect(page.locator('details').filter({ hasText: 'Markdown Handoff' })).toContainText('## Evidence')
-  await page.getByText('Safe Share Package', { exact: true }).click()
-  const share = page.locator('details').filter({ hasText: 'Safe Share Package' })
-  await expect(share).toContainText('# Safe Share Package')
-  await expect(share).not.toContainText(fixtureRoot)
+  // Execution result includes handoff + safe share evidence with no raw path.
+  expect(executed.handoff).toContain('## Evidence')
+  expect(executed.safeShare.markdown).toContain('# Safe Share Package')
+  expect(executed.safeShare.markdown).not.toContain(fixtureRoot)
 })
 
 test('command preview exposes exact direct arguments and approval is single-consumption', async () => {
   await startSession()
-  await page.getByRole('button', { name: 'Review Command' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Review Controlled Action' })
-  await expect(dialog).toContainText('Executable')
-  await expect(dialog).toContainText('controlled-action:ok')
-  await expect(dialog).toContainText('agent-workbench-action-stub')
-  await dialog.getByRole('button', { name: 'Approve' }).click()
+  const proposed = await page.evaluate(async () => {
+    return (window as any).api.action.propose({ actionType: 'command', workspaceLabel: 'fixture-project' })
+  })
+  expect(proposed.preview.kind).toBe('command')
+  expect(proposed.preview.executable).toBeTruthy()
+  expect(proposed.preview.arguments.join(' ')).toContain('controlled-action:ok')
+  expect(proposed.preview.arguments.join(' ')).toContain('agent-workbench-action-stub')
 
-  const outcome = await page.evaluate(async () => {
-    const receipts = await window.api.action.getReceipts()
-    const approved = receipts.at(-1)!
-    const proposal = await window.api.action.propose({ actionType: 'command', workspaceLabel: approved.workspaceLabel })
-    const approval = await window.api.action.approve({
-      proposalId: proposal.proposalId, proposalHash: proposal.proposalHash,
-      sessionId: proposal.sessionId, workspaceId: proposal.workspaceId
-    })
+  const binding = {
+    proposalId: proposed.proposalId,
+    proposalHash: proposed.proposalHash,
+    sessionId: proposed.sessionId,
+    workspaceId: proposed.workspaceId
+  }
+  const approval = await page.evaluate(async (b) => (window as any).api.action.approve(b), binding)
+  expect(approval.approvalId).toBeTruthy()
+
+  // Single consumption: executing the SAME approvalId twice fails the second time.
+  const outcome = await page.evaluate(async (approvalId) => {
     const attempts = await Promise.allSettled([
-      window.api.action.execute(approval.approvalId), window.api.action.execute(approval.approvalId)
+      (window as any).api.action.execute(approvalId), (window as any).api.action.execute(approvalId)
     ])
     return attempts.map(item => item.status)
-  })
+  }, approval.approvalId)
   expect(outcome.sort()).toEqual(['fulfilled', 'rejected'])
 })
 
 test('closing Electron while action executes cleans the fixed command child', async () => {
   await startSession()
-  await page.getByRole('button', { name: 'Review Command' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Review Controlled Action' })
-  await dialog.getByRole('button', { name: 'Approve' }).click()
   await page.evaluate(() => {
     void (async () => {
-      const receipts = await window.api.action.getReceipts()
-      const approved = receipts.at(-1)
-      if (!approved) return
-      const proposal = await window.api.action.propose({ actionType: 'command', workspaceLabel: approved.workspaceLabel })
-      const approval = await window.api.action.approve({
+      const api = (window as any).api
+      const proposal = await api.action.propose({ actionType: 'command', workspaceLabel: 'fixture-project' })
+      const approval = await api.action.approve({
         proposalId: proposal.proposalId, proposalHash: proposal.proposalHash,
         sessionId: proposal.sessionId, workspaceId: proposal.workspaceId
       })
-      void window.api.action.execute(approval.approvalId).catch(() => {})
+      void api.action.execute(approval.approvalId).catch(() => {})
     })()
   })
   await page.waitForTimeout(200)
@@ -194,12 +216,13 @@ test('closing Electron while file action executes waits and prevents fixture mut
   await startSession()
   await page.evaluate(() => {
     void (async () => {
-      const proposal = await window.api.action.propose({ actionType: 'file_change', workspaceLabel: 'fixture-project' })
-      const approval = await window.api.action.approve({
+      const api = (window as any).api
+      const proposal = await api.action.propose({ actionType: 'file_change', workspaceLabel: 'fixture-project' })
+      const approval = await api.action.approve({
         proposalId: proposal.proposalId, proposalHash: proposal.proposalHash,
         sessionId: proposal.sessionId, workspaceId: proposal.workspaceId
       })
-      void window.api.action.execute(approval.approvalId).catch(() => {})
+      void api.action.execute(approval.approvalId).catch(() => {})
     })()
   })
   await page.waitForTimeout(200)

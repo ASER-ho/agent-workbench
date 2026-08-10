@@ -88,40 +88,46 @@ test('0.1.2-A shell chrome renders: rail, topbar brand, inspector, statusbar', a
 test('rail navigates between workspace / verification / environment / settings views', async () => {
   const rail = page.getByRole('navigation', { name: 'Primary' })
 
-  // Default view is the workspace welcome tab (WelcomeTab also embeds a
-  // VerificationWorkbench, so confirm the capsule card is present too).
-  await expect(page.getByRole('heading', { name: 'Agent Workbench' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '编辑概览' })).toBeVisible()
+  // Default view is the Project Desk (workspace home).
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '项目文件' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '新建验证' })).toBeVisible()
 
-  // Verification view shows the VerificationWorkbench; the WelcomeTab unmounts.
+  // Verification view shows the VerificationWorkbench.
   await rail.getByRole('button', { name: '验证' }).click()
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '编辑概览' })).toBeHidden()
 
   // Environment view shows readiness + diagnostics.
   await rail.getByRole('button', { name: '环境' }).click()
   await expect(page.getByRole('heading', { name: '环境就绪检查' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeHidden()
 
-  // Settings view shows the settings editor.
+  // Settings view shows the product-aligned settings (Appearance default).
   await rail.getByRole('button', { name: '设置' }).click()
-  await expect(page.getByRole('heading', { name: 'API 配置' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '个性化' })).toBeVisible()
 
-  // Back to the workspace welcome view.
+  // Back to the Project Desk.
   await rail.getByRole('button', { name: '工作区' }).click()
-  await expect(page.getByRole('heading', { name: 'Agent Workbench' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '编辑概览' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
 })
 
-test('workspace view restores the file-tree workspace browser entry points', async () => {
-  // The pre-shell Workspace Browser (Memory/Skills/Projects/Config) is mounted
-  // as a secondary panel in the Workspace view — entry points are not lost.
-  await expect(page.getByRole('heading', { name: '工作区' })).toBeVisible()
-  for (const label of ['记忆', '技能', '项目', '配置']) {
+test('workspace shows the Project Desk; Project Files opens the file browser on demand', async () => {
+  // Default workspace view = Project Desk, NOT a permanent legacy sidebar:
+  // the file browser sections are not visible until Project Files is opened.
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
+  await expect(page.getByText('记忆').first()).toBeHidden()
+
+  // Open the Project Files drawer -> the file browser entry points appear.
+  await page.getByRole('button', { name: '项目文件' }).click()
+  await expect(page.getByText('记忆').first()).toBeVisible()
+  for (const label of ['技能', '项目', '配置']) {
     await expect(page.getByText(label).first()).toBeVisible()
   }
-  // The browser's collapse toggle is present.
   await expect(page.getByTitle('收起侧边栏')).toBeVisible()
+
+  // Escape closes the drawer -> the browser is hidden again (no permanent sidebar).
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('记忆').first()).toBeHidden()
 })
 
 test('inspector toggles closed and open from the topbar', async () => {
@@ -253,5 +259,21 @@ test('shell does not render planned/legacy fake-backend nav or buttons', async (
   const bodyText = await page.locator('body').innerText()
   for (const pattern of [/\bAccept\b/, /\bReject\b/, /\bNeeds Work\b/, /\bAgent Claim\b/, /\bHistory\b/, /\bExternal Work\b/]) {
     expect(bodyText, `unexpected fake-backend copy: ${pattern}`).not.toMatch(pattern)
+  }
+})
+
+test('cutover removes the legacy AI-session terminal and provider/agent settings surfaces', async () => {
+  // No global AI-session terminal on the shell (default view = Project Desk).
+  const body = await page.locator('body').innerText()
+  for (const forbidden of ['AI 会话终端', 'Review & Launch', '检查并启动', 'Local Stub Agent Session', 'Stub Agent']) {
+    expect(body, `unexpected legacy terminal copy: ${forbidden}`).not.toContain(forbidden)
+  }
+
+  // Settings hides the legacy API/Provider/Claude-config surfaces.
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '设置' }).click()
+  await expect(page.getByRole('heading', { name: '个性化' })).toBeVisible()
+  const settingsBody = await page.locator('body').innerText()
+  for (const forbidden of ['API Configuration', 'DeepSeek', 'OpenRouter', 'Provider Runtime', 'Test Connection', 'Claude Detection', '检测 Claude Code']) {
+    expect(settingsBody, `unexpected legacy settings copy: ${forbidden}`).not.toContain(forbidden)
   }
 })

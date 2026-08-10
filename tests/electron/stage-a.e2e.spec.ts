@@ -16,13 +16,20 @@ async function openSettings(): Promise<void> {
   // and the workspace browser's own "⚙️ 设置" button would otherwise make an
   // unscoped /设置$/ selector ambiguous.
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /设置$/ }).click()
-  await expect(page.getByRole('heading', { name: 'API 配置' })).toBeVisible()
+  // 0.1.2 Settings opens on Appearance (API Configuration / Diagnostics /
+  // Share Package / Claude Detection sections were removed from Settings).
+  await expect(page.getByRole('heading', { name: '个性化' })).toBeVisible()
 }
 
 async function switchToEnglish(): Promise<void> {
   await page.getByRole('button', { name: /语言$/ }).click()
   await page.getByRole('button', { name: /English$/ }).click()
   await expect(page.getByRole('heading', { name: 'Language' })).toBeVisible()
+}
+
+/** Toggle the locale from the topbar so the current view stays mounted. */
+async function toggleTopbarLocale(): Promise<void> {
+  await page.getByRole('button', { name: /中\s*\/\s*EN/ }).click()
 }
 
 function createFixture(): string {
@@ -140,7 +147,8 @@ test.afterEach(async () => {
 })
 
 test('real Electron main/preload/renderer starts inside an isolated fixture with launch gates closed', async () => {
-  await expect(page.getByRole('heading', { name: 'Agent Workbench' })).toBeVisible()
+  // The 0.1.2 default Workspace view is the Project Desk.
+  await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
 
   const bridge = await page.evaluate(() => ({
     diagnosticsRun: typeof (window as any).api?.diagnostics?.run,
@@ -154,16 +162,24 @@ test('real Electron main/preload/renderer starts inside an isolated fixture with
   expect(bodyText).not.toMatch(/[A-Za-z]:\\[^\s]+/)
   expect(bodyText).not.toMatch(/\\\\[^\\]+\\[^\s]+/)
 
-  const launchButton = page.getByRole('button', { name: /Launch Agent|启动 Agent/ })
-  await expect(launchButton).toBeDisabled()
-
-  const terminalGate = page.getByRole('button', { name: /Review & Launch|检查并启动/ })
-  await expect(terminalGate).toBeVisible()
-  await expect(terminalGate).toBeDisabled()
-  await expect(terminalGate).toHaveAttribute('class', /cursor-not-allowed/)
+  // The 0.1.2 shell hides the legacy TerminalPanel / Review & Launch UI. The
+  // launch gate is still enforced by the session backend: an unsafe workspace
+  // label cannot produce a launch plan and no session is active at boot.
+  const launchGate = await page.evaluate(async () => {
+    const session = (window as any).api.session
+    try {
+      await session.prepareLaunch('Current Workspace')
+      return 'unexpected-success'
+    } catch (error) {
+      return String(error)
+    }
+  })
+  expect(launchGate).toMatch(/session readiness failed|readiness failed/i)
+  const bootStatus = await page.evaluate(() => (window as any).api.session.getStatus())
+  expect(bootStatus.status).toBe('stopped')
 })
 
-test('Chinese welcome does not retain ordinary English status copy', async () => {
+test('Chinese shell does not retain ordinary English status copy', async () => {
   const bodyText = await page.locator('body').innerText()
   for (const forbidden of [
     'Current Workspace', 'Provider: default', 'No Key', 'Phase 1 active', 'Build verified', 'Pack blocked',
@@ -174,9 +190,12 @@ test('Chinese welcome does not retain ordinary English status copy', async () =>
   }
 })
 
-test('English API and diagnostics views contain no Chinese UI copy and preserve the report across locale navigation', async () => {
-  await openSettings()
-  await page.getByRole('button', { name: /环境诊断$/ }).click()
+test('English environment and settings views contain no Chinese UI copy and preserve the report across locale switch', async () => {
+  // Diagnostics moved to the Environment view in 0.1.2 (rail "环境" item).
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /环境$/ }).click()
+
+  // Wait for the initial auto-run, then verify the run button disables during a run.
+  await expect(page.getByRole('button', { name: /复制诊断摘要/ })).toBeVisible()
   const runDiagnosticsButton = page.getByRole('button', { name: /运行诊断/ })
   const disabledDuringRun = await runDiagnosticsButton.evaluate(async element => {
     ;(element as HTMLButtonElement).click()
@@ -189,9 +208,9 @@ test('English API and diagnostics views contain no Chinese UI copy and preserve 
   const before = await page.evaluate(async () => (await (window as any).api.diagnostics.getLastReport())?.timestamp ?? null)
   expect(before).not.toBeNull()
 
-  await page.getByRole('button', { name: /语言$/ }).click()
-  await page.getByRole('button', { name: /English$/ }).click()
-  await page.getByRole('button', { name: /Environment Diagnostics$/ }).click()
+  // Switch locale via the topbar so the Environment view stays mounted and the
+  // already-produced report is preserved (no re-run on locale change).
+  await toggleTopbarLocale()
   await expect(page.getByRole('button', { name: /Copy Diagnostics Summary/ })).toBeVisible()
 
   const after = await page.evaluate(async () => (await (window as any).api.diagnostics.getLastReport())?.timestamp ?? null)
@@ -218,42 +237,46 @@ test('English API and diagnostics views contain no Chinese UI copy and preserve 
   expect(copied).not.toContain(fixtureRoot)
   expect(copied).not.toMatch(/[A-Za-z]:\\[^\s]+/)
 
-  await page.getByRole('button', { name: /API Configuration/ }).click()
-  const englishApiText = await page.locator('body').innerText()
-  expect(englishApiText).not.toMatch(/[\u4e00-\u9fff]/)
+  // Still-visible English views must contain no Chinese UI copy.
+  const environmentText = await page.locator('body').innerText()
+  expect(environmentText).not.toMatch(/[\u4e00-\u9fff]/)
 
-  await page.getByRole('button', { name: /Share Package$/ }).click()
-  const englishShareText = await page.locator('body').innerText()
-  expect(englishShareText).not.toMatch(/[\u4e00-\u9fff]/)
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Settings$/ }).click()
+  expect(await page.locator('body').innerText()).not.toMatch(/[\u4e00-\u9fff]/)
+
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Workspace$/ }).click()
+  expect(await page.locator('body').innerText()).not.toMatch(/[\u4e00-\u9fff]/)
 })
 
-test('English API connection failure uses renderer locale copy without external network', async () => {
+test('API test connection rejects an invalid URL without external network', async () => {
   await openSettings()
   await switchToEnglish()
-  await page.getByRole('button', { name: /API Configuration$/ }).click()
+  // The Language section intentionally keeps "\u7b80\u4f53\u4e2d\u6587" as a self-labeled
+  // language name, so assert the English no-Chinese invariant on Appearance.
+  await page.getByRole('button', { name: /Appearance$/ }).click()
+  expect(await page.locator('body').innerText()).not.toMatch(/[\u4e00-\u9fff]/)
 
-  await page.getByPlaceholder('https://api.openai.com/v1').fill('not-a-valid-url')
-  await page.locator('input[type="password"]').fill(fakeOpenAiKey('e2e-localhost-only'))
-  await page.getByRole('button', { name: 'Test Connection', exact: true }).click()
-  await expect(page.getByText(/Connection failed/).first()).toBeVisible()
-
-  const bodyText = await page.locator('body').innerText()
-  expect(bodyText).not.toMatch(/[\u4e00-\u9fff]/)
+  // API Configuration UI was removed in 0.1.2; drive the backend directly.
+  const result = await page.evaluate(async () => {
+    const api = (window as any).api.api
+    return api.testConnection('not-a-valid-url', 'sk-e2e-localhost-only')
+  })
+  expect(result.success).toBe(false)
+  expect(result.message).toMatch(/invalid/i)
 })
 
-test('saved fixture API key is displayed with a fixed mask only', async () => {
+test('saved fixture API key is persisted with a fixed mask only', async () => {
   const fakeKey = fakeOpenAiKey('e2e-fixed-mask-0123456789abcdef1234')
-  await openSettings()
 
-  await page.getByPlaceholder('https://api.openai.com/v1').fill('https://api.example.com/v1')
-  const keyInput = page.locator('input[type="password"]')
-  await keyInput.fill(fakeKey)
-  await page.getByRole('button', { name: '保存配置', exact: true }).click()
-  await expect(page.getByText('✓ 已保存', { exact: true })).toBeVisible()
-
-  const maskedInput = page.locator('input[type="text"][disabled]').first()
-  await expect(maskedInput).toHaveValue('********')
-  await expect(maskedInput).not.toHaveValue(/sk-e2e|1234/)
+  // API Configuration UI was removed in 0.1.2; drive the save/load backend directly.
+  const saveResult = await page.evaluate(async (key) => {
+    return (window as any).api.api.saveConfig({
+      provider: 'OpenAI',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: key
+    })
+  }, fakeKey)
+  expect(saveResult.success).toBe(true)
 
   const savedSettings = readFileSync(join(fixtureRoot, 'settings', 'settings.json'), 'utf8')
   const parsedSettings = JSON.parse(savedSettings) as { api_test_config?: Record<string, unknown> }
@@ -262,6 +285,10 @@ test('saved fixture API key is displayed with a fixed mask only', async () => {
   expect(savedSettings).not.toContain(fakeKey)
   expect(savedSettings).not.toContain(fakeOpenAiKey('e2e'))
   expect(savedSettings).not.toContain('1234')
+
+  const loaded = await page.evaluate(async () => (window as any).api.api.loadConfig())
+  expect(loaded.apiKeyPrefix).toBe('********')
+  expect(loaded.hasKey).toBe(true)
 
   const bindingResult = await page.evaluate(async () => {
     const api = (window as any).api
@@ -301,31 +328,62 @@ test('capsule save reloads the sanitized path before rendering', async () => {
   await page.evaluate(() => localStorage.setItem('agent-workbench-locale', 'en'))
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
-  await page.getByRole('button', { name: 'Edit Capsule' }).click()
 
-  await page.getByPlaceholder('e.g. My Agent Project').fill(fakeKey)
-  const repeatedPlaceholderInputs = page.getByPlaceholder('e.g. agent-workbench-desktop')
-  await repeatedPlaceholderInputs.nth(0).fill(`token: ${fakeToken}`)
-  await repeatedPlaceholderInputs.nth(1).fill(fixtureRoot)
-  await page.getByPlaceholder('Add project context, handoff notes, or next steps...').fill(`Fixture path: ${fixtureRoot}; API_KEY=${fakeKey}; ANTHROPIC_AUTH_TOKEN=${fakeAuthToken}`)
-  await page.getByRole('button', { name: 'Save Capsule' }).click()
-  await expect(page.getByRole('button', { name: 'Edit Capsule' })).toBeVisible()
+  // 0.1.2 hides the Project Capsule editor from the Workspace view; drive the
+  // capsule backend directly with a capsule containing secrets + a full path.
+  const saveResult = await page.evaluate(async ({ fakeKey, fakeToken, fakeAuthToken, fixtureRoot }) => {
+    const now = new Date().toISOString()
+    const capsule = {
+      capsuleVersion: 1,
+      projectName: fakeKey,
+      workspaceLabel: `token: ${fakeToken}`,
+      safePathLabel: fixtureRoot,
+      lastOpenedAt: now,
+      safetyState: {
+        providerStatus: 'default', secretsSafe: true, pathsSafe: true, releaseBlocked: true,
+        buildStatus: 'pass', packStatus: 'blocked', phaseStatus: 'phase-1-active', workspaceSelected: true
+      },
+      notes: `Fixture path: ${fixtureRoot}; API_KEY=${fakeKey}; ANTHROPIC_AUTH_TOKEN=${fakeAuthToken}`,
+      createdAt: now,
+      updatedAt: now
+    }
+    return (window as any).api.capsule.save(capsule)
+  }, { fakeKey, fakeToken, fakeAuthToken, fixtureRoot })
+  expect(saveResult.success).toBe(true)
 
+  // The saved project-capsule.json must contain no raw secret/token/path.
+  const savedCapsule = readFileSync(join(fixtureRoot, 'workspace', 'memory', 'project-capsule.json'), 'utf8')
+  const parsedCapsule = JSON.parse(savedCapsule) as { safePathLabel?: string; notes?: string }
+  expect(parsedCapsule.safePathLabel).toBe(basename(fixtureRoot))
+  expect(parsedCapsule.notes).toContain('[path hidden]')
+  expect(parsedCapsule.notes).toContain('********')
+  expect(savedCapsule).not.toContain(fixtureRoot)
+  expect(savedCapsule).not.toContain(fakeKey)
+  expect(savedCapsule).not.toContain(fakeToken)
+  expect(savedCapsule).not.toContain(fakeAuthToken)
+
+  // load() must return the sanitized values.
+  const loaded = await page.evaluate(async () => {
+    const result = await (window as any).api.capsule.load()
+    return { source: result.source, capsule: result.capsule }
+  })
+  expect(loaded.source).toBe('saved')
+  expect(loaded.capsule.projectName).toBe('********')
+  expect(loaded.capsule.notes).toContain('[path hidden]')
+  expect(loaded.capsule.notes).toContain('********')
+  expect(loaded.capsule.safePathLabel).toBe(basename(fixtureRoot))
+  expect(JSON.stringify(loaded.capsule)).not.toContain(fakeKey)
+  expect(JSON.stringify(loaded.capsule)).not.toContain(fakeToken)
+  expect(JSON.stringify(loaded.capsule)).not.toContain(fakeAuthToken)
+
+  // Reload so the Project Desk re-renders from the saved capsule; the body must
+  // expose no raw secret or full path.
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
   const bodyText = await page.locator('body').innerText()
   expect(bodyText).not.toContain(fixtureRoot)
   expect(bodyText).not.toContain(fakeKey)
   expect(bodyText).not.toContain(fakeToken)
   expect(bodyText).not.toContain(fakeAuthToken)
-  expect(bodyText).toContain(basename(fixtureRoot))
   expect(bodyText).toContain('********')
-  expect(bodyText).toContain('[path hidden]')
-
-  const savedCapsule = readFileSync(join(fixtureRoot, 'workspace', 'memory', 'project-capsule.json'), 'utf8')
-  const parsedCapsule = JSON.parse(savedCapsule) as { safePathLabel?: string; notes?: string }
-  expect(parsedCapsule.safePathLabel).toBe(basename(fixtureRoot))
-  expect(parsedCapsule.notes).toContain('[path hidden]')
-  expect(savedCapsule).not.toContain(fixtureRoot)
-  expect(savedCapsule).not.toContain(fakeKey)
-  expect(savedCapsule).not.toContain(fakeToken)
-  expect(savedCapsule).not.toContain(fakeAuthToken)
 })

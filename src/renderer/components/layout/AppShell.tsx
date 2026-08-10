@@ -1,16 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useView } from '../../contexts/ViewContext'
-import { useTerminalLayout } from '../../contexts/TerminalLayoutContext'
 import { useLocale } from '../../contexts/LocaleContext'
-import { useSidebar } from '../../contexts/SidebarContext'
 import type { DiagnosticReport } from '../../../shared/ipc-types'
-import MainPanel from './MainPanel'
-import Sidebar from './Sidebar'
-import TerminalPanel from './TerminalPanel'
 import StatusBar from './StatusBar'
 import Rail from './Rail'
 import TopBar from './TopBar'
 import Inspector from './Inspector'
+import WorkspaceDesk from '../views/WorkspaceDesk'
+import ProjectFilesPanel from '../views/ProjectFilesPanel'
 import VerificationWorkbench from '../editors/VerificationWorkbench'
 import ReadyCheckPanel from '../editors/ReadyCheckPanel'
 import DiagnosticsPanel from '../editors/DiagnosticsPanel'
@@ -35,7 +32,9 @@ function useMediaQuery(query: string): boolean {
 
 /**
  * Environment view: readiness checks + full diagnostics, stacked in a
- * scrollable, centered page container.
+ * scrollable, centered page container. Core expression is Workspace / Node /
+ * Git / Verification readiness / Execution boundary; agent-specific detector
+ * appears only as an advanced diagnostic item (never a top-level setting).
  */
 function EnvironmentView() {
   const { t } = useLocale()
@@ -76,29 +75,9 @@ function EnvironmentView() {
 
 export default function AppShell() {
   const { currentView, inspectorOpen, setInspectorOpen } = useView()
-  const { layout, maximized } = useTerminalLayout()
-  const { collapsed: sidebarCollapsed } = useSidebar()
   // Below ~1180px the Inspector becomes an overlay drawer instead of a column.
   const inspectorOverlay = useMediaQuery('(max-width: 1179px)')
-  const [terminalHeight, setTerminalHeight] = useState(200)
-
-  // Preserve the existing bottom-docked terminal drag-resize (80-600px).
-  const handleTerminalResizeStart = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (layout === 'right' || maximized) return
-    e.preventDefault()
-    const startY = e.clientY
-    const startHeight = terminalHeight
-    const handleMouseMove = (ev: MouseEvent) => {
-      const delta = startY - ev.clientY
-      setTerminalHeight(Math.max(80, Math.min(600, startHeight + delta)))
-    }
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }
+  const [projectFilesOpen, setProjectFilesOpen] = useState(false)
 
   const renderView = () => {
     switch (currentView) {
@@ -116,21 +95,18 @@ export default function AppShell() {
         return <SettingsEditor />
       case 'workspace':
       default:
-        // Default view — the existing file-tree Workspace Browser (Sidebar,
-        // reusing the original component + WorkspaceContext data) beside the
-        // tabbed panel (TabBar + WelcomeTab). Restores the pre-shell entry
-        // points for Memory / Skills / Projects / Config.
+        // Workspace home = the Project Desk, with the file browser available
+        // on demand as a Project Files drawer (no permanent legacy sidebar).
         return (
-          <div className="h-full flex overflow-hidden">
-            <div
-              className="flex-shrink-0 overflow-hidden"
-              style={{ width: sidebarCollapsed ? 48 : 260, borderRight: '1px solid var(--border-color)' }}
-            >
-              <Sidebar />
-            </div>
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <MainPanel />
-            </div>
+          <div className="h-full relative overflow-hidden">
+            <WorkspaceDesk
+              projectFilesOpen={projectFilesOpen}
+              onOpenProjectFiles={() => setProjectFilesOpen(true)}
+              onCloseProjectFiles={() => setProjectFilesOpen(false)}
+            />
+            {projectFilesOpen && (
+              <ProjectFilesPanel onClose={() => setProjectFilesOpen(false)} />
+            )}
           </div>
         )
     }
@@ -145,47 +121,8 @@ export default function AppShell() {
         {/* Center column */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <TopBar />
-          <div className={`flex-1 flex min-h-0 overflow-hidden ${layout === 'right' ? 'flex-row' : 'flex-col'}`}>
-            {/* View body */}
-            <div className={`flex-1 min-h-0 min-w-0 overflow-hidden ${maximized ? 'hidden' : ''}`}>
-              {renderView()}
-            </div>
-
-            {/* Terminal (existing behavior preserved) */}
-            {layout === 'right' ? (
-              <>
-                <div
-                  className={`w-1 flex-shrink-0 cursor-col-resize ${maximized ? 'hidden' : ''}`}
-                  style={{ background: 'var(--border-color)' }}
-                />
-                <div
-                  data-terminal-panel
-                  className={`${maximized ? 'flex-1 min-w-0' : 'w-1/2 min-w-[300px] max-w-[60%]'} flex-shrink-0 overflow-hidden`}
-                  style={{ background: 'var(--bg-primary)' }}
-                >
-                  <TerminalPanel />
-                </div>
-              </>
-            ) : (
-              <>
-                <div
-                  className={`h-1 flex-shrink-0 cursor-row-resize ${maximized ? 'hidden' : ''}`}
-                  style={{ background: 'var(--border-color)' }}
-                  onMouseDown={handleTerminalResizeStart}
-                />
-                <div
-                  data-terminal-panel
-                  style={
-                    maximized
-                      ? { flex: '1 1 0%', minHeight: 0, borderTop: '1px solid var(--border-color)' }
-                      : { height: terminalHeight, flexShrink: 0, borderTop: '1px solid var(--border-color)' }
-                  }
-                  className="overflow-hidden"
-                >
-                  <TerminalPanel />
-                </div>
-              </>
-            )}
+          <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+            {renderView()}
           </div>
         </div>
 

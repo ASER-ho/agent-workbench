@@ -91,6 +91,10 @@ test.beforeEach(async () => {
   page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
   await installIpcRecorder()
+  // 0.1.2 shell: the default workspace view is the Project Desk. Enter the
+  // Verification view so the VerificationWorkbench (只读验收) is reachable.
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '验证' }).click()
+  await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()
 })
 
 test.afterEach(async () => {

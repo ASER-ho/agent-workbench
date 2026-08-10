@@ -15,6 +15,7 @@ const LOCALE_DATA: Record<Locale, Record<string, string>> = {
   zh: {
     "app.name": "Agent Workbench",
     "app.version": "版本",
+    "app.techStack": "技术栈",
     "sidebar.workspace": "工作区",
     "sidebar.refresh": "刷新",
     "sidebar.memory": "记忆",
@@ -689,6 +690,7 @@ const LOCALE_DATA: Record<Locale, Record<string, string>> = {
   en: {
     "app.name": "Agent Workbench",
     "app.version": "Version",
+    "app.techStack": "Tech Stack",
     "sidebar.workspace": "Workspace",
     "sidebar.refresh": "Refresh",
     "sidebar.memory": "Memory",
