@@ -256,10 +256,11 @@ test('VERIFY: running state shows no fake percentage; cancel yields a real CANCE
   // Cancel -> real CANCELLED result state with what/why/next.
   await page.getByRole('button', { name: '取消执行' }).click()
   const result = resultRegion()
-  await expect(result.getByText('验证执行被取消。')).toBeVisible()
-  await expect(result.getByText('已取消')).toBeVisible()
-  // Honest next step is present.
-  await expect(result.getByRole('button', { name: '重新生成预览并验证' })).toBeVisible()
+  // C's Result Workbench renders the real Insufficient-Evidence state with the
+  // cancelled reason; the actionable next step is provided beside the result.
+  await expect(result.getByText('证据不足').first()).toBeVisible()
+  await expect(result.getByText(/执行被取消/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新生成预览并验证' })).toBeVisible()
 })
 
 test('VERIFY: a hanging test times out into a real TIMEOUT state', async () => {
@@ -275,8 +276,8 @@ test('VERIFY: a hanging test times out into a real TIMEOUT state', async () => {
   await expect(verifyRegion().getByText('正在执行受控验证')).toBeVisible()
   // The manager's fixed 30s timeout fires; no fake progress is shown meanwhile.
   const result = resultRegion()
-  await expect(result.getByText('验证执行超时。')).toBeVisible({ timeout: 45_000 })
-  await expect(result.getByText('超时', { exact: true })).toBeVisible()
+  await expect(result.getByText(/测试命令超时/).first()).toBeVisible({ timeout: 45_000 })
+  await expect(result.getByText('证据不足').first()).toBeVisible()
 })
 
 test('VERIFY: a test that mutates the subject yields Subject Changed + Insufficient Evidence', async () => {
@@ -289,7 +290,7 @@ test('VERIFY: a test that mutates the subject yields Subject Changed + Insuffici
   await page.getByRole('button', { name: '一次确认并执行' }).click()
 
   const result = resultRegion()
-  await expect(result.getByText('验证期间项目状态发生变化。')).toBeVisible()
+  await expect(result.getByText(/验证期间 Subject 已变化/).first()).toBeVisible()
   await expect(result.getByText('证据不足').first()).toBeVisible()
   // No path leak.
   await expect(page.locator('body')).not.toContainText(root)

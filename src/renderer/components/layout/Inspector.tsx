@@ -1,6 +1,14 @@
+import { useEffect, useState } from 'react'
 import { useView } from '../../contexts/ViewContext'
 import { useLocale } from '../../contexts/LocaleContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import VerificationInspectorContent from '../verification/VerificationInspectorContent'
+import ResultInspectorContent from '../result/ResultInspectorContent'
+import {
+  getVerificationInspector,
+  subscribeVerificationInspector,
+  type VerificationInspectorSnapshot
+} from '../verification/verification-inspector-bridge'
 
 /** Display-safe basename of a path — never expose a full path. */
 function workspaceBasename(root: string): string {
@@ -14,16 +22,45 @@ interface InspectorProps {
 }
 
 /**
- * Generic Context Inspector shell for 0.1.2-A.
- * Full Evidence/Receipt inspector arrives in 0.1.2-B/C — this is intentionally
- * a basic container driven by the current view.
+ * Context Inspector shell for 0.1.2. The right panel is a live, contextual
+ * surface: for the Verification view it renders the Verification / Result
+ * inspector content driven by the workbench's published snapshot; for other
+ * views it shows the view's basic context summary.
  */
 export default function Inspector({ overlay = false }: InspectorProps) {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const { currentView, setInspectorOpen } = useView()
   const { root } = useWorkspace()
 
+  // Live snapshot published by the Verification Workbench (module-scoped bridge).
+  const [inspector, setInspector] = useState<VerificationInspectorSnapshot>(() => getVerificationInspector())
+  useEffect(() => subscribeVerificationInspector(setInspector), [])
+
   const renderBody = () => {
+    if (currentView === 'verification') {
+      // RESULT stage → Agent C's Result inspector (criterion / evidence / verdict).
+      if (inspector.context === 'result' && inspector.result) {
+        return <ResultInspectorContent result={inspector.result} locale={locale} />
+      }
+      // DEFINE / REVIEW / VERIFY → Agent B's Verification inspector.
+      const verifContext = inspector.context === 'result' ? 'contract' : inspector.context
+      return (
+        <VerificationInspectorContent
+          context={verifContext}
+          contract={inspector.contract}
+          testPath={inspector.testPath}
+          workspace={inspector.workspace}
+          inspection={inspector.inspection}
+          preview={inspector.preview}
+          previewBusy={inspector.previewBusy}
+          previewError={inspector.previewError}
+          executing={inspector.executing}
+          elapsedSeconds={inspector.elapsedSeconds}
+          commandStatus={inspector.commandStatus}
+        />
+      )
+    }
+
     switch (currentView) {
       case 'workspace': {
         const base = workspaceBasename(root)
@@ -38,12 +75,6 @@ export default function Inspector({ overlay = false }: InspectorProps) {
           </div>
         )
       }
-      case 'verification':
-        return (
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            {t('inspector.verificationHint')}
-          </p>
-        )
       case 'environment':
         return (
           <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>

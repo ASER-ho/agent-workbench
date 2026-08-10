@@ -25,7 +25,7 @@ import { computeCompleteness, validateContract } from '../verification/verificat
 import ContractFormSection from '../verification/ContractFormSection'
 import ReviewSection from '../verification/ReviewSection'
 import VerifyRunningSection from '../verification/VerifyRunningSection'
-import ResultSection from '../verification/ResultSection'
+import ResultWorkbench from '../result/ResultWorkbench'
 import { publishVerificationInspector } from '../verification/verification-inspector-bridge'
 
 type WorkspaceStatus = Awaited<ReturnType<typeof window.api.workspaceSelection.getStatus>>
@@ -84,7 +84,7 @@ const stageMeta: Record<FlowStage, { labelZh: string; labelEn: string; subtitleZ
 }
 
 export default function VerificationWorkbench() {
-  const { tr } = useTr()
+  const { tr, locale } = useTr()
   const [stage, setStage] = useState<FlowStage>('define')
   const [contract, setContract] = useState<VerificationContract>(() => ({ ...draftStore.contract }))
   const [testPath, setTestPath] = useState(draftStore.testPath)
@@ -360,8 +360,9 @@ export default function VerificationWorkbench() {
 
   // Publish inspector context for the integration agent.
   useEffect(() => {
-    let context: 'contract' | 'subject' | 'execution' | 'running'
-    if (stage === 'verify') context = 'running'
+    let context: 'contract' | 'subject' | 'execution' | 'running' | 'result'
+    if (stage === 'result' && cvResult) context = 'result'
+    else if (stage === 'verify') context = 'running'
     else if (stage === 'review') context = preview ? 'execution' : 'subject'
     else context = 'contract'
     publishVerificationInspector({
@@ -375,7 +376,8 @@ export default function VerificationWorkbench() {
       previewError,
       executing: stage === 'verify',
       elapsedSeconds: stage === 'verify' ? elapsed : undefined,
-      commandStatus: cvResult && cvResult.state === 'executed' ? cvResult.commandStatus : undefined
+      commandStatus: cvResult && cvResult.state === 'executed' ? cvResult.commandStatus : undefined,
+      result: cvResult
     })
   }, [stage, contract, testPath, workspace, inspection, preview, previewBusy, previewError, elapsed, cvResult])
 
@@ -451,13 +453,39 @@ export default function VerificationWorkbench() {
       )}
 
       {stage === 'result' && cvResult && (
-        <ResultSection
-          result={cvResult}
-          exportMsg={exportMsg}
-          onExport={exportReceipt}
-          onBackToDefine={handleBackToDefine}
-          onRegenerate={() => { void handleRegenerate() }}
-        />
+        <>
+          {/* B→C handoff: Agent C's Result Workbench renders the real result. */}
+          <ResultWorkbench
+            result={cvResult}
+            locale={locale}
+            onExport={exportReceipt}
+            exportPending={confirmBusy}
+          />
+          {exportMsg && (
+            <p className="mt-3 text-xs" role="status" style={{ color: 'var(--text-secondary)' }}>
+              {exportMsg}
+            </p>
+          )}
+          {/* Actionable next steps (real existing operations) beside the result. */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBackToDefine}
+              className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-90"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+            >
+              {tr('返回编辑合同', 'Back to contract')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { void handleRegenerate() }}
+              className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-90"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {tr('重新生成预览并验证', 'Regenerate preview & verify')}
+            </button>
+          </div>
+        </>
       )}
     </section>
   )

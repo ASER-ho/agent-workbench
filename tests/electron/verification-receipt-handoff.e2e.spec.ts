@@ -43,7 +43,8 @@ function workbench() {
 }
 
 function resultRegion() {
-  return page.getByRole('region', { name: '验证结果' })
+  // 0.1.2-C Result Workbench region.
+  return page.getByRole('region', { name: '验证结果工作面' })
 }
 
 async function fillContract(testName: string): Promise<void> {
@@ -118,7 +119,7 @@ test('R2D: passing test produces a verifiable JSON Receipt and Markdown Handoff'
 
   // Export both JSON and Markdown.
   await resultRegion().getByRole('button', { name: '导出两者' }).click()
-  await expect(resultRegion().getByText('导出成功。')).toBeVisible()
+  await expect(page.getByText('导出成功。')).toBeVisible()
 
   const jsonPath = join(exportDir, 'verification-receipt.json')
   const mdPath = join(exportDir, 'verification-handoff.md')
@@ -161,7 +162,7 @@ test('R2D: a failing test still exports a non-VERIFIED Receipt', async () => {
   await expect(resultRegion().getByText('验收失败').first()).toBeVisible()
 
   await resultRegion().getByRole('button', { name: '导出 JSON Receipt' }).click()
-  await expect(resultRegion().getByText('导出成功。')).toBeVisible()
+  await expect(page.getByText('导出成功。')).toBeVisible()
 
   const jsonPath = join(exportDir, 'verification-receipt.json')
   expect(existsSync(jsonPath)).toBe(true)

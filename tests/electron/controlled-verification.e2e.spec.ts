@@ -46,7 +46,8 @@ function reviewRegion() {
 }
 
 function resultRegion() {
-  return page.getByRole('region', { name: '验证结果' })
+  // 0.1.2-C Result Workbench region.
+  return page.getByRole('region', { name: '验证结果工作面' })
 }
 
 async function fillContract(): Promise<void> {
@@ -127,13 +128,15 @@ test('controlled verification preview and one-time confirm run a passing test an
   // VERIFY: confirm once and execute.
   await page.getByRole('button', { name: '一次确认并执行' }).click()
 
-  // RESULT: real ControlledVerificationResult.
+  // RESULT: real ControlledVerificationResult rendered by the 0.1.2-C Result
+  // Workbench. Assert C's actual texts: verdict label, evidence ledger status,
+  // subject stability, evidence freshness/validity.
   const result = resultRegion()
   await expect(result.getByText('已验证').first()).toBeVisible()
   await expect(result.getByText('通过', { exact: true })).toBeVisible()
-  await expect(result.getByText('Subject 前后一致')).toBeVisible()
-  await expect(result.getByText('证据有效')).toBeVisible()
-  await expect(result.getByText('证据新鲜')).toBeVisible()
+  await expect(result.getByText('Subject 前后一致').first()).toBeVisible()
+  await expect(result.getByText('有效', { exact: true }).first()).toBeVisible()
+  await expect(result.getByText('新鲜', { exact: true }).first()).toBeVisible()
   await expect(page.locator('body')).not.toContainText(root)
   await page.screenshot({ path: testInfo.outputPath('controlled-verification-pass.png'), fullPage: true })
 })
@@ -161,6 +164,6 @@ test('a code change after preview makes the confirmation stale', async () => {
   writeFileSync(join(workspace, 'src', 'late-change.txt'), 'late\n', 'utf8')
 
   await page.getByRole('button', { name: '一次确认并执行' }).click()
-  await expect(resultRegion().getByText('验证被拒绝')).toBeVisible()
-  await expect(resultRegion().getByText('代码或工作区已变化，确认失效。')).toBeVisible()
+  await expect(resultRegion().getByText('确认被拒绝')).toBeVisible()
+  await expect(resultRegion().getByText(/代码或工作区已变化/).first()).toBeVisible()
 })

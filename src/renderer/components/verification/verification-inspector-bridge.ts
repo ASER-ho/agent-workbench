@@ -9,10 +9,11 @@
 import type { VerificationContract, VerificationInspection } from '../../../shared/verification-types'
 import type {
   ControlledVerificationCommandStatus,
-  ControlledVerificationPreview
+  ControlledVerificationPreview,
+  ControlledVerificationResult
 } from '../../../shared/controlled-verification-execution-types'
 
-export type VerificationInspectorContext = 'contract' | 'subject' | 'execution' | 'running'
+export type VerificationInspectorContext = 'contract' | 'subject' | 'execution' | 'running' | 'result'
 
 export interface VerificationInspectorSnapshot {
   context: VerificationInspectorContext
@@ -26,6 +27,8 @@ export interface VerificationInspectorSnapshot {
   executing?: boolean
   elapsedSeconds?: number
   commandStatus?: ControlledVerificationCommandStatus
+  /** Present when the workbench is at the RESULT stage (drives the Result inspector). */
+  result?: ControlledVerificationResult | null
 }
 
 type Listener = (snapshot: VerificationInspectorSnapshot) => void
