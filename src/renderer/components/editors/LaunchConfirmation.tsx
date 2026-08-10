@@ -17,10 +17,10 @@ export default function LaunchConfirmation() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [diag, apiConfig, capsuleResult, runtimeStatus] = await Promise.all([
-        window.api.diagnostics.run(), window.api.api.loadConfig(), window.api.capsule.load(), window.api.runtime.getStatus()
+      const [diag, capsuleResult, runtimeStatus] = await Promise.all([
+        window.api.diagnostics.run(), window.api.capsule.load(), window.api.runtime.getStatus()
       ])
-      const res = evaluateReadiness(diag as DiagnosticReport, { hasKey: apiConfig.hasKey, hasLegacyKey: apiConfig.hasLegacyKey }, capsuleResult.capsule, capsuleResult.source)
+      const res = evaluateReadiness(diag as DiagnosticReport, capsuleResult.capsule, capsuleResult.source)
       setReadiness(res)
       setProviderMode(runtimeStatus.mode === 'custom' ? 'custom' : 'default')
       setWorkspaceLabel(capsuleResult.capsule.workspaceLabel ?? '')

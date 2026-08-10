@@ -37,7 +37,6 @@ function localizeReadinessText(text: string | undefined, t: (k: string) => strin
     'Environment variables': 'readiness.raw.environmentVariables',
     'Windows Registry': 'readiness.raw.windowsRegistry',
     'Settings env': 'readiness.raw.settingsEnv',
-    'API key configured': 'readiness.raw.apiKeyConfigured',
     'Build': 'readiness.raw.build',
     'Project Capsule': 'readiness.raw.projectCapsule',
     'Available': 'readiness.raw.available',
@@ -52,10 +51,6 @@ function localizeReadinessText(text: string | undefined, t: (k: string) => strin
     'Registry entries could interfere with runtime.': 'readiness.raw.registryDetail',
     'Clean — settings.json env section is empty': 'readiness.raw.settingsClean',
     'settings.json env section has entries': 'readiness.raw.settingsDetected',
-    'Configured but uses legacy storage — migration recommended': 'readiness.raw.apiLegacy',
-    'Configured with secure storage': 'readiness.raw.apiSecure',
-    'Not configured — set up API key in Settings': 'readiness.raw.apiMissing',
-    'Open Settings to configure a provider and API key.': 'readiness.raw.apiDetail',
     'Verified': 'readiness.raw.verified',
     'Build status unknown — run diagnostics': 'readiness.raw.buildUnknown',
     'Restored from local storage': 'readiness.raw.capsuleRestored',
@@ -77,10 +72,10 @@ export default function ReadyCheckPanel() {
     setLoading(true)
     setError(false)
     try {
-      const [diag, apiConfig, capsuleResult] = await Promise.all([
-        window.api.diagnostics.run(), window.api.api.loadConfig(), window.api.capsule.load()
+      const [diag, capsuleResult] = await Promise.all([
+        window.api.diagnostics.run(), window.api.capsule.load()
       ])
-      const res = evaluateReadiness(diag as DiagnosticReport, { hasKey: apiConfig.hasKey, hasLegacyKey: apiConfig.hasLegacyKey }, capsuleResult.capsule, capsuleResult.source)
+      const res = evaluateReadiness(diag as DiagnosticReport, capsuleResult.capsule, capsuleResult.source)
       setResult(res)
     } catch (e) {
       setError(true)

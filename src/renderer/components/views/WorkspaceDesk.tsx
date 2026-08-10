@@ -13,7 +13,6 @@ interface WorkspaceDeskProps {
 
 type WorkspaceStatus = Awaited<ReturnType<typeof window.api.workspaceSelection.getStatus>>
 type CapsuleLoadResult = Awaited<ReturnType<typeof window.api.capsule.load>>
-type ApiConfig = Awaited<ReturnType<typeof window.api.api.loadConfig>>
 
 /** Display-safe basename of a path — never expose a full path. */
 function pathBasename(root: string): string {
@@ -63,16 +62,15 @@ export default function WorkspaceDesk({
     setLoading(true)
     setError(null)
     try {
-      const [ws, dg, cap, cfg] = await Promise.all([
+      const [ws, dg, cap] = await Promise.all([
         window.api.workspaceSelection.getStatus(),
         window.api.diagnostics.run(),
-        window.api.capsule.load(),
-        window.api.api.loadConfig() as Promise<ApiConfig>
+        window.api.capsule.load()
       ])
       setWorkspace(ws)
       setDiag(dg)
       setCapsule(cap)
-      setReadiness(evaluateReadiness(dg, { hasKey: cfg.hasKey, hasLegacyKey: cfg.hasLegacyKey }, cap.capsule, cap.source))
+      setReadiness(evaluateReadiness(dg, cap.capsule, cap.source))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {

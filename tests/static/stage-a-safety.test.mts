@@ -109,3 +109,17 @@ test('Stage A renderer cannot start an Agent and contains no remote release muta
   assert.doesNotMatch(source, /window\.api\.terminal\.start\s*\(/)
   assert.doesNotMatch(source, /\bgit\s+(?:push|tag)\b|\bgh\s+release\s+create\b/i)
 })
+
+test('Stage A Verification readiness does not read legacy API config in the active UI', () => {
+  // MAJOR-2: the 0.1.2 Verification path (local controlled node --test) needs no
+  // Provider/API key, so the active Project Desk / Environment readiness must not
+  // call api.loadConfig() nor re-render the cut-over API-key copy.
+  const desk = read('src/renderer/components/views/WorkspaceDesk.tsx')
+  const ready = read('src/renderer/components/editors/ReadyCheckPanel.tsx')
+  for (const label of ['WorkspaceDesk', 'ReadyCheckPanel']) {
+    const src = label === 'WorkspaceDesk' ? desk : ready
+    assert.doesNotMatch(src, /window\.api\.api\.loadConfig/, `${label} still reads legacy API config`)
+    assert.doesNotMatch(src, /apiConfig|hasKey|hasLegacyKey/, `${label} still wires API key into readiness`)
+  }
+  assert.doesNotMatch(ready, /API key configured|set up API key in Settings|configure a provider and API key/)
+})

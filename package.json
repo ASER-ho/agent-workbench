@@ -18,6 +18,7 @@
     "test:action": "node --experimental-strip-types --no-warnings --test tests/unit/controlled-action.test.mts",
     "test:rollback": "node --experimental-strip-types --no-warnings --test tests/unit/model-rollback-boundary.test.mts",
     "test:result-workbench": "node --experimental-strip-types --no-warnings --test tests/unit/result-workbench.test.mts",
+    "test:readiness": "node --experimental-strip-types --no-warnings --test tests/unit/readiness-rules.test.mts",
     "test:electron": "playwright test -c playwright.electron.config.ts",
     "test:static": "node --experimental-strip-types --no-warnings --test tests/static/stage-a-safety.test.mts tests/static/stage-d-release.test.mts tests/static/private-path-scan.test.mts tests/static/brand-scan.test.mts tests/static/browser-smoke-harness.test.mts tests/static/credential-shape-scan.test.mts",
     "test:privacy": "node scripts/private-path-scan.mjs src out",

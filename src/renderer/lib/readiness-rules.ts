@@ -60,7 +60,6 @@ function worstOf(ids: string[], report: DiagnosticReport | null): CheckStatus {
  */
 export function evaluateReadiness(
   diagReport: DiagnosticReport | null,
-  apiConfig: { hasKey: boolean; hasLegacyKey: boolean } | null,
   capsule: ProjectCapsule | null,
   capsuleSource: 'saved' | 'default' | 'fallback'
 ): ReadinessResult {
@@ -118,19 +117,6 @@ export function evaluateReadiness(
     status: settingsEnvStatus,
     summary: settingsEnvStatus === 'ok' ? 'Clean — settings.json env section is empty' : 'settings.json env section has entries',
     detail: settingsEnv?.displaySummary ?? settingsEnv?.summary
-  })
-
-  // ── API config ──
-  const apiHasKey = apiConfig?.hasKey ?? false
-  const apiHasLegacy = apiConfig?.hasLegacyKey ?? false
-  const apiStatus: CheckStatus = !apiHasKey ? 'warn' : apiHasLegacy ? 'warn' : 'ok'
-  checks.push({
-    id: 'api-config', label: 'API key configured',
-    status: apiStatus,
-    summary: apiHasKey
-      ? (apiHasLegacy ? 'Configured but uses legacy storage — migration recommended' : 'Configured with secure storage')
-      : 'Not configured — set up API key in Settings',
-    detail: !apiHasKey ? 'Open Settings to configure a provider and API key.' : undefined
   })
 
   // ── Build ──

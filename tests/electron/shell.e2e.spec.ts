@@ -285,6 +285,17 @@ test('cutover removes the legacy AI-session terminal and provider/agent settings
   for (const forbidden of ['API Configuration', 'DeepSeek', 'OpenRouter', 'Provider Runtime', 'Test Connection', 'Claude Detection', '检测 Claude Code']) {
     expect(settingsBody, `unexpected legacy settings copy: ${forbidden}`).not.toContain(forbidden)
   }
+
+  // Environment readiness must not include the legacy API-key check (MAJOR-2).
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '环境' }).click()
+  await expect(page.getByRole('heading', { name: '环境就绪检查' })).toBeVisible()
+  // Wait for the readiness check list to render (Node.js row) so the absence
+  // assertion is meaningful, then confirm no API-key readiness copy exists.
+  await expect(page.getByText('Node.js').first()).toBeVisible()
+  const envBody = await page.locator('body').innerText()
+  for (const forbidden of ['API Key 配置', '未配置 — 请在设置中配置 API Key', '打开设置以配置 Provider 和 API Key']) {
+    expect(envBody, `unexpected legacy readiness API copy in Environment: ${forbidden}`).not.toContain(forbidden)
+  }
 })
 
 async function resizeWindow(w: number, h: number): Promise<void> {
