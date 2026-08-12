@@ -102,7 +102,7 @@
   "settings.dark": "Dark Mode",
   "settings.light": "Light Mode",
   "settings.about": "About",
-  "settings.aboutDesc": "Desktop client for Claude Code Workspace. Browse memory, view skills, manage transcripts, run Claude Code — all in one place.",
+  "settings.aboutDesc": "Independent local desktop workbench for AI coding agents.",
 
   "context.newFile": "New File",
   "context.newFolder": "New Folder",

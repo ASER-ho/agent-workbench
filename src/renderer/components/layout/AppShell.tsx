@@ -7,7 +7,6 @@ import Rail from './Rail'
 import TopBar from './TopBar'
 import Inspector from './Inspector'
 import WorkspaceDesk from '../views/WorkspaceDesk'
-import ProjectFilesPanel from '../views/ProjectFilesPanel'
 import VerificationWorkbench from '../editors/VerificationWorkbench'
 import ReadyCheckPanel from '../editors/ReadyCheckPanel'
 import DiagnosticsPanel from '../editors/DiagnosticsPanel'
@@ -113,7 +112,6 @@ export default function AppShell() {
   const { currentView, inspectorOpen, setInspectorOpen, setInspectorOpenResponsive, inspectorUserToggled } = useView()
   // Below ~1180px the Inspector becomes an overlay drawer instead of a column.
   const inspectorOverlay = useMediaQuery('(max-width: 1179px)')
-  const [projectFilesOpen, setProjectFilesOpen] = useState(false)
 
   // Responsive Inspector default: on desktop the Inspector is open by default;
   // crossing into the narrow (<1180px) range must safely close a merely-default
@@ -146,18 +144,10 @@ export default function AppShell() {
         return <SettingsEditor />
       case 'workspace':
       default:
-        // Workspace home = the Project Desk, with the file browser available
-        // on demand as a Project Files drawer (no permanent legacy sidebar).
+        // Workspace home = the Project Desk (self-contained; no file browser).
         return (
           <div className="h-full relative overflow-hidden">
-            <WorkspaceDesk
-              projectFilesOpen={projectFilesOpen}
-              onOpenProjectFiles={() => setProjectFilesOpen(true)}
-              onCloseProjectFiles={() => setProjectFilesOpen(false)}
-            />
-            {projectFilesOpen && (
-              <ProjectFilesPanel onClose={() => setProjectFilesOpen(false)} />
-            )}
+            <WorkspaceDesk />
           </div>
         )
     }

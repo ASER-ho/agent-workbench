@@ -5,12 +5,6 @@ import { useLocale } from '../../contexts/LocaleContext'
 import { useView } from '../../contexts/ViewContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
-interface WorkspaceDeskProps {
-  projectFilesOpen: boolean
-  onOpenProjectFiles: () => void
-  onCloseProjectFiles: () => void
-}
-
 type WorkspaceStatus = Awaited<ReturnType<typeof window.api.workspaceSelection.getStatus>>
 type CapsuleLoadResult = Awaited<ReturnType<typeof window.api.capsule.load>>
 
@@ -27,14 +21,11 @@ function pathBasename(root: string): string {
  *   - project identity: workspace basename + optional saved capsule name
  *   - environment summary: Node.js version + Git availability from diagnostics
  *   - verification readiness: derived from evaluateReadiness(diagnostics, …)
- *   - primary actions: New Verification, Project Files
+ *   - primary actions: New Verification
  *
- * No fake KPIs, no fake history, no recent-result persistence. The Project Files
- * drawer is mounted by the shell (AppShell) as a sibling, not inside this desk.
+ * No fake KPIs, no fake history, no recent-result persistence.
  */
-export default function WorkspaceDesk({
-  onOpenProjectFiles
-}: WorkspaceDeskProps) {
+export default function WorkspaceDesk() {
   const { t, locale } = useLocale()
   const { navigate } = useView()
   const { root } = useWorkspace()
@@ -168,17 +159,6 @@ export default function WorkspaceDesk({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={onOpenProjectFiles}
-                  className="inline-flex items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors hover:opacity-90"
-                  style={{ ...controlBtn, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M1.8 4.5A1.3 1.3 0 0 1 3.1 3.2h3l1.4 1.5h4.4a1.3 1.3 0 0 1 1.3 1.3v5.2a1.3 1.3 0 0 1-1.3 1.3H3.1a1.3 1.3 0 0 1-1.3-1.3V4.5Z" />
-                  </svg>
-                  {tr('项目文件', 'Project Files')}
-                </button>
-                <button
-                  type="button"
                   onClick={() => navigate('verification')}
                   className="inline-flex items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-opacity hover:opacity-90"
                   style={{ ...controlBtn, background: 'var(--accent)', color: '#fff' }}
@@ -233,7 +213,7 @@ export default function WorkspaceDesk({
                 <dl className="mt-3 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between gap-3">
                     <dt style={{ color: 'var(--text-tertiary)' }}>{tr('Node.js', 'Node.js')}</dt>
-                    <dd className="font-mono truncate" style={{ color: nodeText ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                    <dd className="truncate" style={{ color: nodeText ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
                       {nodeText ?? tr('未找到', 'Not found')}
                     </dd>
                   </div>
@@ -257,11 +237,11 @@ export default function WorkspaceDesk({
                       <span className="text-sm font-medium" style={{ color: verdictText }}>{verdictLabel}</span>
                     </div>
                     <div className="mt-2 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      {readiness.okCount}{t('readiness.okCount')}
+                      {readiness.okCount} {t('readiness.okCount')}
                       {' · '}
-                      {readiness.warnCount}{t('readiness.warnCount')}
+                      {readiness.warnCount} {t('readiness.warnCount')}
                       {' · '}
-                      {readiness.errorCount}{t('readiness.errCount')}
+                      {readiness.errorCount} {t('readiness.errCount')}
                     </div>
                   </>
                 ) : (

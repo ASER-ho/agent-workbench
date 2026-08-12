@@ -90,7 +90,6 @@ test('rail navigates between workspace / verification / environment / settings v
 
   // Default view is the Project Desk (workspace home).
   await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '项目文件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '新建验证' })).toBeVisible()
 
   // Verification view shows the VerificationWorkbench.
@@ -111,31 +110,13 @@ test('rail navigates between workspace / verification / environment / settings v
   await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
 })
 
-test('workspace shows the Project Desk; Project Files opens the file browser on demand', async () => {
-  // Default workspace view = Project Desk, NOT a permanent legacy sidebar:
-  // the file browser sections are not visible until Project Files is opened.
+test('workspace shows the Project Desk with no legacy file-browser drawer', async () => {
+  // Default workspace view = the Project Desk, self-contained: the legacy
+  // Project Files drawer (and its Provider/API-attached Sidebar) is gone.
   await expect(page.getByRole('heading', { name: '项目工作台' })).toBeVisible()
-  await expect(page.getByText('记忆').first()).toBeHidden()
-
-  // Open the Project Files drawer -> the file browser entry points appear.
-  await page.getByRole('button', { name: '项目文件' }).click()
-  await expect(page.getByText('记忆').first()).toBeVisible()
-  for (const label of ['技能', '项目', '配置']) {
-    await expect(page.getByText(label).first()).toBeVisible()
-  }
-  await expect(page.getByTitle('收起侧边栏')).toBeVisible()
-
-  // The Project Files drawer must not resurrect the legacy Provider/API surface:
-  // no API header, no connection status, no fabricated token estimates.
-  const drawer = page.getByRole('dialog', { name: '项目文件' })
-  await expect(drawer).toBeVisible()
-  const drawerBody = await drawer.innerText()
-  for (const forbidden of ['API', '已连接', '未配置密钥']) {
-    expect(drawerBody, `unexpected legacy API surface in Project Files: ${forbidden}`).not.toContain(forbidden)
-  }
-
-  // Escape closes the drawer -> the browser is hidden again (no permanent sidebar).
-  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: '项目文件' })).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '项目文件' })).toHaveCount(0)
+  // Legacy file-browser sections must not appear anywhere on the desk.
   await expect(page.getByText('记忆').first()).toBeHidden()
 })
 
@@ -284,6 +265,18 @@ test('cutover removes the legacy AI-session terminal and provider/agent settings
   const settingsBody = await page.locator('body').innerText()
   for (const forbidden of ['API Configuration', 'DeepSeek', 'OpenRouter', 'Provider Runtime', 'Test Connection', 'Claude Detection', '检测 Claude Code']) {
     expect(settingsBody, `unexpected legacy settings copy: ${forbidden}`).not.toContain(forbidden)
+  }
+
+  // Settings must not contain the legacy source-integrity dev tool.
+  expect(settingsBody, 'legacy Integrity Check resurfaced').not.toContain('验证完整性')
+
+  // About shows the real version + current product description, not the stale
+  // "Claude Code workspace client" branding or the legacy terminal stack.
+  await page.getByRole('button', { name: /关于/ }).click()
+  await expect(page.getByText(/版本\s*0\.1\.2/)).toBeVisible()
+  const aboutBody = await page.locator('body').innerText()
+  for (const forbidden of ['Claude Code', 'xterm.js', 'node-pty']) {
+    expect(aboutBody, `unexpected stale About copy: ${forbidden}`).not.toContain(forbidden)
   }
 
   // Environment readiness must not include the legacy API-key check (MAJOR-2).

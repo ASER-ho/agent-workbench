@@ -102,7 +102,7 @@
   "settings.dark": "深色模式",
   "settings.light": "浅色模式",
   "settings.about": "关于",
-  "settings.aboutDesc": "Claude Code 工作区的桌面客户端。浏览记忆文件、查看技能、管理项目转录本、运行 Claude Code，一站式完成。",
+  "settings.aboutDesc": "独立本地 AI 编码代理桌面工作台。",
 
   "context.newFile": "新建文件",
   "context.newFolder": "新建文件夹",

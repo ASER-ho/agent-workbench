@@ -66,8 +66,9 @@ test('Stage A dynamic IPC messages are mapped to locale-owned copy', () => {
   assert.doesNotMatch(settings, /setTestResult\(r\.message\)/)
   assert.doesNotMatch(settings, /alert\(['"]Error:/)
   assert.doesNotMatch(settings, /providerSetResult\.message|packageResult\.error|packageResult\.securityScan\.message|String\(resetResult\.message\)/)
-  // Remaining dynamic-message surfaces use locale-owned copy, not raw backend text.
-  assert.match(settings, /settings\.integrityCheckFailed/)
+  // Remaining dynamic-message surfaces use locale-owned copy, not raw backend text
+  // (the Integrity Check surface that used settings.integrityCheckFailed was
+  // removed in the Settings cutover; AppShell below still exercises this rule).
   const shell = read('src/renderer/components/layout/AppShell.tsx')
   assert.match(shell, /diag\.failed/)
   const desk = read('src/renderer/components/views/WorkspaceDesk.tsx')
@@ -122,4 +123,18 @@ test('Stage A Verification readiness does not read legacy API config in the acti
     assert.doesNotMatch(src, /apiConfig|hasKey|hasLegacyKey/, `${label} still wires API key into readiness`)
   }
   assert.doesNotMatch(ready, /API key configured|set up API key in Settings|configure a provider and API key/)
+})
+
+test('Stage A Settings and Readiness use theme-aware, product-aligned surfaces', () => {
+  // Human-smoke findings: the active Settings must not keep the legacy
+  // source-integrity dev tool, the stale About branding, or dark-only styles.
+  const settings = read('src/renderer/components/editors/SettingsEditor.tsx')
+  assert.doesNotMatch(settings, /maintenance\.integrityCheck|maintenance\.integrityRepair/, 'Settings still wires the legacy integrity dev tool')
+  assert.doesNotMatch(settings, /settings\.integrity/, 'Settings still renders the Integrity Check section')
+  assert.doesNotMatch(settings, /xterm\.js|node-pty/, 'About still shows the legacy terminal stack')
+  assert.doesNotMatch(settings, /0\.1\.0/, 'About still shows a stale version')
+
+  const ready = read('src/renderer/components/editors/ReadyCheckPanel.tsx')
+  assert.doesNotMatch(ready, /bg-gray-900|text-gray-200|border-gray-800|bg-gray-950|text-\[9px\]/, 'ReadyCheckPanel still uses dark-only hardcoded styling')
+  assert.match(ready, /var\(--bg-secondary\)/, 'ReadyCheckPanel not theme-driven')
 })
