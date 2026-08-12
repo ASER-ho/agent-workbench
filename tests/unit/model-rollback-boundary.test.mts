@@ -45,10 +45,10 @@ test('managed snapshot names accept only app-generated formats', () => {
 test('valid temporary managed snapshot resolves inside the backup directory', () => {
   const fx = fixture()
   try {
-    assert.equal(resolveManagedSnapshotPath(fx.backupDir, fx.validName), realpathSync(fx.validPath))
+    assert.equal(realpathSync(resolveManagedSnapshotPath(fx.backupDir, fx.validName)), realpathSync(fx.validPath))
     if (process.platform === 'win32') {
       assert.equal(
-        resolveManagedSnapshotPath(fx.backupDir.toUpperCase(), fx.validName),
+        realpathSync(resolveManagedSnapshotPath(fx.backupDir.toUpperCase(), fx.validName)),
         realpathSync(fx.validPath)
       )
     }

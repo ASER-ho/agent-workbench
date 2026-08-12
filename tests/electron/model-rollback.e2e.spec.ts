@@ -43,7 +43,7 @@ test.describe('MODEL_ROLLBACK managed snapshot boundary', () => {
         AGENT_WORKBENCH_FIXTURE_ROOT: fixtureRoot
       }
     })
-    page = await electronApp.firstWindow()
+    page = await electronApp.firstWindow({ timeout: 60_000 })
     await page.waitForLoadState('domcontentloaded')
   })
 

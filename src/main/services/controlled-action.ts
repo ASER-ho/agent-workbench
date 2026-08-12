@@ -403,7 +403,8 @@ export class ControlledActionManager {
     }
     mkdirSync(dirname(target), { recursive: true })
     const parentReal = await fs.realpath(dirname(target))
-    const parentRel = relative(this.workspaceRoot, parentReal)
+    const rootReal = await fs.realpath(this.workspaceRoot)
+    const parentRel = relative(rootReal, parentReal)
     if (parentRel.startsWith('..') || isAbsolute(parentRel)) throw new Error('symlink target escapes workspace')
     if (existsSync(target)) {
       if (lstatSync(target).isSymbolicLink()) throw new Error('symlink target is forbidden')

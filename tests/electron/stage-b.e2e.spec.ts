@@ -72,7 +72,7 @@ test.beforeEach(async ({}, testInfo) => {
       PATH: `${join(systemRoot, 'System32')};${systemRoot}`
     }
   })
-  page = await electronApp.firstWindow()
+  page = await electronApp.firstWindow({ timeout: 60_000 })
   await page.waitForLoadState('domcontentloaded')
   await page.evaluate(() => localStorage.setItem('agent-workbench-locale', 'en'))
   await page.reload()

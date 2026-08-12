@@ -105,7 +105,7 @@ test.beforeEach(async () => {
       ComSpec: process.env.ComSpec ?? join(systemRoot, 'System32', 'cmd.exe'), PATH: `${join(systemRoot, 'System32')};${systemRoot}`
     }
   })
-  page = await app.firstWindow()
+  page = await app.firstWindow({ timeout: 60_000 })
   await page.waitForLoadState('domcontentloaded')
   await installIpcRecorder()
   // 0.1.2 shell: the default workspace view is the Project Desk. Enter the

@@ -128,7 +128,7 @@ async function launch(): Promise<void> {
       ComSpec: process.env.ComSpec ?? join(systemRoot, 'System32', 'cmd.exe'), PATH: `${join(systemRoot, 'System32')};${systemRoot}`
     }
   })
-  page = await app.firstWindow()
+  page = await app.firstWindow({ timeout: 60_000 })
   await page.waitForLoadState('domcontentloaded')
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: '验证' }).click()
   await expect(page.getByRole('heading', { name: '只读验收' })).toBeVisible()

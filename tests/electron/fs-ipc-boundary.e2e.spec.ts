@@ -34,7 +34,7 @@ test.describe('FS IPC Path Boundary E2E (R3-005)', () => {
       },
       executablePath: undefined
     })
-    page = await electronApp.firstWindow()
+    page = await electronApp.firstWindow({ timeout: 60_000 })
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1000)
   })

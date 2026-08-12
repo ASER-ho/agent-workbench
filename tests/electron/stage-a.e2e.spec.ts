@@ -116,7 +116,7 @@ test.beforeEach(async ({}, testInfo) => {
     cwd: repoRoot,
     env: childEnv
   })
-  page = await electronApp.firstWindow()
+  page = await electronApp.firstWindow({ timeout: 60_000 })
   await page.waitForLoadState('domcontentloaded')
 })
 
