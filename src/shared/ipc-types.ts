@@ -278,5 +278,18 @@ export const IPC_CHANNELS = {
   CONTROLLED_VERIFICATION_PREVIEW: 'controlled-verification:preview',
   CONTROLLED_VERIFICATION_CONFIRM: 'controlled-verification:confirm',
   CONTROLLED_VERIFICATION_CANCEL: 'controlled-verification:cancel',
-  CONTROLLED_VERIFICATION_EXPORT: 'controlled-verification:export'
+  CONTROLLED_VERIFICATION_EXPORT: 'controlled-verification:export',
+
+  // Passive observation + auto-verification
+  OBSERVATION_STATUS: 'observation:status',
+  OBSERVATION_ENABLE: 'observation:enable',
+  OBSERVATION_DISABLE: 'observation:disable',
+  OBSERVATION_INSTALL_HOOKS_PREVIEW: 'observation:install-hooks-preview',
+  OBSERVATION_CONFIRM_INSTALL_HOOKS: 'observation:confirm-install-hooks',
+  OBSERVATION_UNINSTALL_HOOKS: 'observation:uninstall-hooks',
+  OBSERVATION_SET_AUTO_VERIFY: 'observation:set-auto-verify',
+  OBSERVATION_GET_LAST_RECEIPT: 'observation:get-last-receipt',
+  OBSERVATION_EVENT: 'observation:event',
+  OBSERVATION_SESSION_UPDATED: 'observation:session-updated',
+  OBSERVATION_VERIFICATION_COMPLETED: 'observation:verification-completed'
 } as const

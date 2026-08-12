@@ -12,6 +12,7 @@ import VerificationWorkbench from '../editors/VerificationWorkbench'
 import ReadyCheckPanel from '../editors/ReadyCheckPanel'
 import DiagnosticsPanel from '../editors/DiagnosticsPanel'
 import SettingsEditor from '../editors/SettingsEditor'
+import ObservationPanel from '../editors/ObservationPanel'
 
 /**
  * Environment view: readiness checks + full diagnostics, stacked in a
@@ -85,6 +86,7 @@ function EnvironmentView() {
           </div>
         )}
         <DiagnosticsPanel report={report} loading={loading} error={error} onRun={run} />
+        <ObservationPanel />
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import { LocaleProvider } from './contexts/LocaleContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { DensityProvider } from './contexts/DensityContext'
 import { SidebarProvider } from './contexts/SidebarContext'
+import { ObservationProvider } from './contexts/ObservationContext'
 
 export default function App() {
   return (
@@ -18,10 +19,12 @@ export default function App() {
             <TabProvider>
               <TerminalLayoutProvider>
                 <SidebarProvider>
-                  <ViewProvider>
-                    <AppShell />
-                    <CommandPalette />
-                  </ViewProvider>
+                  <ObservationProvider>
+                    <ViewProvider>
+                      <AppShell />
+                      <CommandPalette />
+                    </ViewProvider>
+                  </ObservationProvider>
                 </SidebarProvider>
               </TerminalLayoutProvider>
             </TabProvider>

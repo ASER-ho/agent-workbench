@@ -17,6 +17,9 @@ import { registerWorkspaceHandlers } from '../services/workspace-foundation/work
 import { ClaudeProcessManager } from '../services/claude-process'
 import { FileSecretStore } from '../services/secret-store'
 import { setTrustedIpcWindow } from './trusted-ipc'
+import { IPC_CHANNELS } from '../../shared/ipc-types'
+import { registerObservationHandlers } from './observation'
+import { ObservationManager } from '../services/observation/observation-manager'
 
 export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
   setTrustedIpcWindow(mainWindow)
@@ -45,4 +48,14 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
   registerVerificationHandlers()
   registerControlledVerificationHandlers()
   actionManager = registerActionHandlers(() => sessionManager.getSnapshot())
+
+  // Passive observation: transcript polling + loopback hook server. Push events
+  // are forwarded to the renderer; the renderer can never reach the agent.
+  const observationManager = new ObservationManager({
+    onSessionsChanged: (sessions) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, sessions),
+    onVerificationCompleted: (receipt) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, receipt),
+    onEvent: (event) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_EVENT, event)
+  })
+  void observationManager.enable()
+  registerObservationHandlers(observationManager)
 }

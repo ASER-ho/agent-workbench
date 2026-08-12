@@ -5,6 +5,7 @@ import { buildVerificationReceipt } from '../../shared/verification-receipt-buil
 import type { VerificationReceipt } from '../../shared/verification-receipt-types.ts'
 import { CONTROLLED_VERIFICATION_CRITERION_ID } from '../../shared/controlled-verification-execution-types.ts'
 import { ControlledVerificationManager } from '../services/controlled-verification-manager.ts'
+import { rememberContract } from '../services/observation/contract-store'
 import { VerificationExportService } from '../services/verification-export-service.ts'
 import { trustedIpcMain as ipcMain } from './trusted-ipc.ts'
 import type { ControlledVerificationResult } from '../../shared/controlled-verification-execution-types.ts'
@@ -95,6 +96,7 @@ export function registerControlledVerificationHandlers(): void {
   const exportService = new VerificationExportService({ isPackaged: () => app.isPackaged })
 
   ipcMain.handle(IPC_CHANNELS.CONTROLLED_VERIFICATION_PREVIEW, async (_event, raw: unknown) => {
+    rememberContract((raw as { contract?: unknown } | null)?.contract)
     return manager.createPreview(raw)
   })
 

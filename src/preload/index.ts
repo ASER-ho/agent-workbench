@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-types'
 import type { DiagnosticReport, RuntimeProviderStatus, SetRuntimeProviderRequest, PackageProgress } from '../shared/ipc-types'
+import type { AutoVerifySettings, HookPreviewResult, ObservedAgentEvent, ObservedSession, ObservationStatus } from '../shared/observation-types'
 import type { ProjectCapsule } from '../shared/capsule-types'
 import type { SessionLaunchPlan, SessionReadiness, SessionSnapshot } from '../shared/session-types'
 import type {
@@ -131,6 +132,19 @@ export interface AgentWorkbenchApi {
     run: () => Promise<DiagnosticReport>
     getLastReport: () => Promise<DiagnosticReport | null>
   }
+  observation: {
+    status: () => Promise<ObservationStatus>
+    enable: () => Promise<ObservationStatus>
+    disable: () => Promise<ObservationStatus>
+    installHooksPreview: () => Promise<HookPreviewResult>
+    confirmInstallHooks: () => Promise<{ ok: boolean; backupPath: string | null; reason?: string }>
+    uninstallHooks: () => Promise<{ ok: boolean; restored: boolean }>
+    setAutoVerify: (settings: AutoVerifySettings) => Promise<ObservationStatus>
+    getLastReceipt: () => Promise<unknown>
+    onEvent: (callback: (event: ObservedAgentEvent) => void) => () => void
+    onSessionUpdated: (callback: (sessions: ObservedSession[]) => void) => () => void
+    onVerificationCompleted: (callback: (receipt: unknown) => void) => () => void
+  }
   session: {
     readiness: (workspaceLabel: string, confirmationId?: string) => Promise<SessionReadiness>
     prepareLaunch: (workspaceLabel: string) => Promise<SessionLaunchPlan>
@@ -252,6 +266,31 @@ const api: AgentWorkbenchApi = {
   diagnostics: {
     run: () => ipcRenderer.invoke(IPC_CHANNELS.DIAGNOSTICS_RUN),
     getLastReport: () => ipcRenderer.invoke(IPC_CHANNELS.DIAGNOSTICS_LAST_REPORT)
+  },
+  observation: {
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_STATUS),
+    enable: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_ENABLE),
+    disable: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_DISABLE),
+    installHooksPreview: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_INSTALL_HOOKS_PREVIEW),
+    confirmInstallHooks: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_CONFIRM_INSTALL_HOOKS),
+    uninstallHooks: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_UNINSTALL_HOOKS),
+    setAutoVerify: (settings) => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_SET_AUTO_VERIFY, settings),
+    getLastReceipt: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_GET_LAST_RECEIPT),
+    onEvent: (callback) => {
+      const handler = (_e, e) => callback(e)
+      ipcRenderer.on(IPC_CHANNELS.OBSERVATION_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_EVENT, handler)
+    },
+    onSessionUpdated: (callback) => {
+      const handler = (_e, sessions) => callback(sessions)
+      ipcRenderer.on(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, handler)
+    },
+    onVerificationCompleted: (callback) => {
+      const handler = (_e, receipt) => callback(receipt)
+      ipcRenderer.on(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, handler)
+    }
   },
   session: {
     readiness: (workspaceLabel, confirmationId) => ipcRenderer.invoke(IPC_CHANNELS.SESSION_READINESS, { workspaceLabel, confirmationId }),
