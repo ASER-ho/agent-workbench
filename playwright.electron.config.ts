@@ -7,7 +7,9 @@ export default defineConfig({
   reporter: 'list',
   workers: 1,
   fullyParallel: false,
-  retries: 0,
+  // First Electron cold start on a shared CI runner can exceed even 60s; the
+  // retry re-launches the app on a warm cache (subsequent launches are fast).
+  retries: process.env.CI ? 1 : 0,
   use: {
     trace: 'off',
     screenshot: 'only-on-failure'

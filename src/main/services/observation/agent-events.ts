@@ -10,9 +10,22 @@ import type { AgentKind, ObservedAgentEvent, ObservedEventName } from '../../../
  *
  * Safety rules enforced here:
  *  - tool input is never kept — only a 16-hex SHA-256 digest.
- *  - an event missing sessionId or cwd is dropped.
+ *  - `raw` never retains tool_input / tool arguments (stripped before storing).
+ *  - the event is missing sessionId or cwd -> dropped.
  *  - unknown/malformed transcript lines are skipped, never thrown.
+ *
+ * `ObservedAgentEventInternal` is MAIN-PROCESS-ONLY: it carries cwd,
+ * transcriptPath and raw, and must never be sent over IPC. Use
+ * `toPublicEvent()` for anything that crosses to the renderer.
  */
+
+export interface ObservedAgentEventInternal extends ObservedAgentEvent {
+  cwd: string
+  transcriptPath: string | null
+  sourcePid?: number
+  /** Raw source line/payload — debug/tests only, never rendered. */
+  raw: unknown
+}
 
 const CLAUDE_HOOK_EVENT_MAP: Record<string, ObservedEventName> = {
   SessionStart: 'session:start',
@@ -49,7 +62,7 @@ function digest(value: unknown): string | undefined {
 }
 
 /** Map a Claude Code HTTP hook stdin payload to an internal event. */
-export function normalizeHookEvent(payload: unknown, tokenOk: boolean): ObservedAgentEvent | null {
+export function normalizeHookEvent(payload: unknown, tokenOk: boolean): ObservedAgentEventInternal | null {
   if (!tokenOk) return null
   const p = asRecord(payload)
   if (!p) return null
@@ -63,6 +76,7 @@ export function normalizeHookEvent(payload: unknown, tokenOk: boolean): Observed
   const toolName = str(p['tool_name']) ?? undefined
   const toolInputDigest = toolName ? digest(p['tool_input']) : undefined
   const sourcePid = typeof p['source_pid'] === 'number' ? p['source_pid'] : undefined
+  // Never retain the raw tool input; store the rest for debug only.
   const safeRaw: Record<string, unknown> = { ...p }
   delete safeRaw['tool_input']
   return {
@@ -70,6 +84,7 @@ export function normalizeHookEvent(payload: unknown, tokenOk: boolean): Observed
     event: mapped,
     sessionId,
     cwd,
+    displayPath: displayPath(cwd),
     transcriptPath: str(p['transcript_path']),
     toolName,
     toolInputDigest,
@@ -79,7 +94,7 @@ export function normalizeHookEvent(payload: unknown, tokenOk: boolean): Observed
   }
 }
 
-function parseClaudeTranscriptLine(line: Record<string, unknown>): ObservedAgentEvent | null {
+function parseClaudeTranscriptLine(line: Record<string, unknown>): ObservedAgentEventInternal | null {
   const type = str(line['type'])
   if (!type) return null
   const sessionId = str(line['sessionId']) ?? str(line['session_id'])
@@ -87,21 +102,24 @@ function parseClaudeTranscriptLine(line: Record<string, unknown>): ObservedAgent
   if (!sessionId || !cwd) return null
   const timestamp = typeof line['timestamp'] === 'number' ? line['timestamp'] : Date.now()
   const transcriptPath = str(line['transcriptPath']) ?? null
+  // Claude transcript lines may carry tool results (toolUseResult.stdout) or
+  // assistant message content. Keep only structural fields for `raw`.
+  const safeRaw: Record<string, unknown> = { type, sessionId, cwd }
   switch (type) {
     case 'user':
-      return { agentKind: 'claude-code', event: 'user:prompt', sessionId, cwd, transcriptPath, timestamp, raw: line }
+      return { agentKind: 'claude-code', event: 'user:prompt', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath, timestamp, raw: safeRaw }
     case 'assistant':
-      return { agentKind: 'claude-code', event: 'assistant:stop', sessionId, cwd, transcriptPath, timestamp, raw: line }
+      return { agentKind: 'claude-code', event: 'assistant:stop', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath, timestamp, raw: safeRaw }
     case 'system':
-      return { agentKind: 'claude-code', event: 'notification', sessionId, cwd, transcriptPath, timestamp, raw: line }
+      return { agentKind: 'claude-code', event: 'notification', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath, timestamp, raw: safeRaw }
     case 'attachment':
-      return { agentKind: 'claude-code', event: 'notification', sessionId, cwd, transcriptPath, timestamp, raw: line }
+      return { agentKind: 'claude-code', event: 'notification', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath, timestamp, raw: safeRaw }
     default:
       return null
   }
 }
 
-function parseCodexTranscriptLine(line: Record<string, unknown>): ObservedAgentEvent | null {
+function parseCodexTranscriptLine(line: Record<string, unknown>): ObservedAgentEventInternal | null {
   const type = str(line['type'])
   if (!type) return null
   const timestamp = typeof line['timestamp'] === 'number' ? line['timestamp'] : Date.now()
@@ -111,7 +129,7 @@ function parseCodexTranscriptLine(line: Record<string, unknown>): ObservedAgentE
     const sessionId = str(line['id']) ?? str(payload?.['id'])
     const cwd = str(payload?.['cwd'])
     if (!sessionId || !cwd) return null
-    return { agentKind: 'codex', event: 'session:start', sessionId, cwd, transcriptPath: null, timestamp, raw: line }
+    return { agentKind: 'codex', event: 'session:start', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath: null, timestamp, raw: { type } }
   }
 
   const sessionId = str(line['sessionId']) ?? str(payload?.['sessionId'])
@@ -121,9 +139,9 @@ function parseCodexTranscriptLine(line: Record<string, unknown>): ObservedAgentE
   if (type === 'response_item') {
     const itemType = str(payload?.['type'])
     if (itemType === 'function_call' || itemType === 'custom_tool_call') {
-      const safePayload: Record<string, unknown> = { ...(payload ?? {}) }
-      delete safePayload['arguments']
-      return { agentKind: 'codex', event: 'tool:start', sessionId, cwd, transcriptPath: null, timestamp, raw: { ...line, payload: safePayload } }
+      // Never retain tool arguments; keep only the call kind.
+      const safePayload: Record<string, unknown> = { type: itemType }
+      return { agentKind: 'codex', event: 'tool:start', sessionId, cwd, displayPath: displayPath(cwd), transcriptPath: null, timestamp, raw: { type, payload: safePayload } }
     }
     return null
   }
@@ -141,14 +159,16 @@ function parseCodexTranscriptLine(line: Record<string, unknown>): ObservedAgentE
     }
     const mapped = msgType ? map[msgType] : undefined
     if (!mapped) return null
-    return { agentKind: 'codex', event: mapped, sessionId, cwd, transcriptPath: null, timestamp, raw: line }
+    // Event messages may embed command output details; keep only the kind.
+    const safePayload: Record<string, unknown> = { type: msgType }
+    return { agentKind: 'codex', event: mapped, sessionId, cwd, displayPath: displayPath(cwd), transcriptPath: null, timestamp, raw: { type, payload: safePayload } }
   }
 
   return null
 }
 
 /** Parse a single JSONL transcript line; tolerant of unknown shapes. */
-export function normalizeTranscriptLine(line: string, agentKind: AgentKind): ObservedAgentEvent | null {
+export function normalizeTranscriptLine(line: string, agentKind: AgentKind): ObservedAgentEventInternal | null {
   const trimmed = line.trim()
   if (!trimmed) return null
   let parsed: unknown
@@ -160,6 +180,15 @@ export function normalizeTranscriptLine(line: string, agentKind: AgentKind): Obs
   const rec = asRecord(parsed)
   if (!rec) return null
   return agentKind === 'codex' ? parseCodexTranscriptLine(rec) : parseClaudeTranscriptLine(rec)
+}
+
+/**
+ * Renderer-safe projection: drops cwd, transcriptPath, sourcePid and raw.
+ * This is the only form that may cross the IPC boundary.
+ */
+export function toPublicEvent(event: ObservedAgentEventInternal): ObservedAgentEvent {
+  const { cwd: _cwd, transcriptPath: _tp, sourcePid: _sp, raw: _raw, ...pub } = event
+  return pub
 }
 
 /** Basename of a path-like string; used for display-safe session labels. */

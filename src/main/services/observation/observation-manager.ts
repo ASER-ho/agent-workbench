@@ -4,10 +4,10 @@ import { TranscriptWatcher } from './transcript-watcher.ts'
 import { HttpObservationEventServer } from './event-server.ts'
 import { HookInstaller, type HookPreview } from './hook-installer.ts'
 import { AutoVerifier } from './auto-verifier.ts'
-import { displayPath } from './agent-events.ts'
+import { displayPath, toPublicEvent, type ObservedAgentEventInternal } from './agent-events.ts'
 import type {
   AutoVerifySettings, HookPreviewResult, ObservedAgentEvent, ObservedEventName, ObservedSession,
-  ObservedSessionStatus, ObservationStatus
+  ObservedSessionStatus, ObservationStatus, VerificationCompletedPayload
 } from '../../../shared/observation-types.ts'
 
 const IDLE_MS = 60_000
@@ -26,9 +26,13 @@ const STATUS_BY_EVENT: Partial<Record<ObservedEventName, ObservedSessionStatus>>
   'session:end': 'ended'
 }
 
+/** Internal session with the full cwd (never crosses IPC). */
+type InternalSession = ObservedSession & { cwd: string }
+
 export interface ObservationManagerDeps {
   onSessionsChanged: (sessions: ObservedSession[]) => void
-  onVerificationCompleted: (receipt: unknown) => void
+  onVerificationCompleted: (payload: VerificationCompletedPayload) => void
+  /** Receives renderer-safe events only — never cwd/raw/transcriptPath. */
   onEvent: (event: ObservedAgentEvent) => void
   /** Test seams: override home-derived paths. */
   claudeProjectsDir?: string
@@ -42,21 +46,26 @@ export class ObservationManager {
   private readonly watcher = new TranscriptWatcher()
   private readonly server = new HttpObservationEventServer()
   private readonly autoVerifier: AutoVerifier
-  private sessions = new Map<string, ObservedSession>()
+  private sessions = new Map<string, InternalSession>()
   private idleTimers = new Map<string, NodeJS.Timeout>()
   private enabled = false
   private lastError: string | null = null
   private installer: HookInstaller | null = null
   private hookSettingsPathValue: string | null = null
+  private homeValue = homedir()
+  private watchedClaudeValue = ''
+  private watchedCodexValue = ''
 
   constructor(deps: ObservationManagerDeps) {
     this.deps = deps
-    this.autoVerifier = new AutoVerifier({ onCompleted: (r) => this.deps.onVerificationCompleted(r) })
+    this.autoVerifier = new AutoVerifier({
+      onCompleted: (r) => this.deps.onVerificationCompleted({ trigger: 'auto:session-end', receipt: r })
+    })
     this.watcher.onEvent((e) => { void this.handleEvent(e) })
     this.server.onEvent((e) => { void this.handleEvent(e) })
   }
 
-  private key(event: ObservedAgentEvent): string {
+  private key(event: ObservedAgentEventInternal): string {
     return `${event.agentKind}:${event.sessionId}`
   }
 
@@ -66,9 +75,13 @@ export class ObservationManager {
     this.lastError = null
     try {
       const { port, token } = await this.server.start()
-      const home = homedir()
+      const home = this.homeValue
       const settingsPath = this.deps.hookSettingsPath ?? join(home, '.claude', 'settings.json')
       const backupPath = this.deps.hookBackupPath ?? join(home, '.claude', 'agent-workbench-hooks.backup.json')
+      const claudeProjects = this.deps.claudeProjectsDir ?? join(home, '.claude', 'projects')
+      const codexSessions = this.deps.codexSessionsDir ?? join(home, '.codex', 'sessions')
+      this.watchedClaudeValue = claudeProjects
+      this.watchedCodexValue = codexSessions
       this.hookSettingsPathValue = settingsPath
       this.installer = new HookInstaller({
         settingsPath,
@@ -77,10 +90,7 @@ export class ObservationManager {
         port,
         token
       })
-      await this.watcher.start({
-        claudeProjects: this.deps.claudeProjectsDir ?? join(home, '.claude', 'projects'),
-        codexSessions: this.deps.codexSessionsDir ?? join(home, '.codex', 'sessions')
-      })
+      await this.watcher.start({ claudeProjects, codexSessions })
     } catch (err) {
       this.lastError = err instanceof Error ? err.message : String(err)
       this.enabled = false
@@ -102,7 +112,12 @@ export class ObservationManager {
       hooksInstalled,
       hookConfigPath: hooksInstalled && this.hookSettingsPathValue ? basename(this.hookSettingsPathValue) : null,
       activeSessions: this.sessionsForPush().filter((s) => s.status !== 'ended'),
-      lastError: this.lastError
+      lastError: this.lastError,
+      autoVerify: this.autoVerifier.getSettings(),
+      watchedDirs: {
+        claudeProjects: this.toTilde(this.watchedClaudeValue),
+        codexSessions: this.toTilde(this.watchedCodexValue)
+      }
     }
   }
 
@@ -131,9 +146,10 @@ export class ObservationManager {
     return this.autoVerifier.getLastReceipt()
   }
 
-  private async handleEvent(event: ObservedAgentEvent): Promise<void> {
+  private async handleEvent(event: ObservedAgentEventInternal): Promise<void> {
     if (!this.enabled) return
-    this.deps.onEvent(event)
+    // Only the display-safe projection ever reaches the renderer.
+    this.deps.onEvent(toPublicEvent(event))
     this.updateSession(event)
     try {
       await this.autoVerifier.handleEvent(event)
@@ -142,11 +158,11 @@ export class ObservationManager {
     }
   }
 
-  private updateSession(event: ObservedAgentEvent): void {
+  private updateSession(event: ObservedAgentEventInternal): void {
     const k = this.key(event)
     const existing = this.sessions.get(k)
     const now = event.timestamp
-    const session: ObservedSession = existing
+    const session: InternalSession = existing
       ? { ...existing, lastEventAt: now, eventCount: existing.eventCount + 1, status: STATUS_BY_EVENT[event.event] ?? existing.status }
       : {
           agentKind: event.agentKind,
@@ -165,11 +181,18 @@ export class ObservationManager {
 
   private sessionsForPush(): ObservedSession[] {
     return [...this.sessions.values()]
+      .map(({ cwd: _cwd, ...pub }) => pub)
       .sort((a, b) => b.lastEventAt - a.lastEventAt)
       .slice(0, 50)
   }
 
-  private resetIdle(k: string, session: ObservedSession): void {
+  private toTilde(p: string): string {
+    const home = this.homeValue
+    if (home && p.startsWith(home)) return '~' + p.slice(home.length)
+    return p
+  }
+
+  private resetIdle(k: string, session: InternalSession): void {
     const existing = this.idleTimers.get(k)
     if (existing) clearTimeout(existing)
     if (session.status === 'ended') return

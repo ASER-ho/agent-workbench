@@ -40,9 +40,32 @@ test('install is idempotent: re-install does not duplicate marker entries', () =
   rmSync(root, { recursive: true, force: true })
 })
 
-test('uninstall restores the backup', () => {
+test('uninstall precisely removes AW hooks and preserves user edits made after install', () => {
   const { root, settingsPath, installer } = setup({ theme: 'light' })
   installer.install()
+  // User adds their own hook + changes a setting AFTER we installed.
+  const afterInstall = JSON.parse(readFileSync(settingsPath, 'utf8'))
+  afterInstall.theme = 'dark'
+  afterInstall.hooks.UserPromptSubmit.push({ hooks: [{ type: 'command', command: 'user-later-hook' }] })
+  writeFileSync(settingsPath, JSON.stringify(afterInstall), 'utf8')
+
+  const r = installer.uninstall()
+  assert.equal(r.ok, true)
+  assert.equal(r.restored, false) // precise removal, not backup restore
+
+  const final = JSON.parse(readFileSync(settingsPath, 'utf8'))
+  assert.equal(final.theme, 'dark') // user's later edit preserved
+  assert.ok(!JSON.stringify(final).includes('agent-workbench')) // AW hooks gone
+  // user's later hook preserved
+  assert.ok(JSON.stringify(final.hooks.UserPromptSubmit).includes('user-later-hook'))
+  rmSync(root, { recursive: true, force: true })
+})
+
+test('uninstall restores from backup only when the current settings are corrupt', () => {
+  const { root, settingsPath, installer } = setup({ theme: 'light' })
+  installer.install()
+  // Simulate catastrophic corruption of the current settings.
+  writeFileSync(settingsPath, '{ broken', 'utf8')
   const r = installer.uninstall()
   assert.equal(r.ok, true)
   assert.equal(r.restored, true)

@@ -106,7 +106,7 @@ export default function SettingsEditor() {
                 <span className="text-3xl">⚡</span>
                 <div>
                   <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Agent Workbench</div>
-                  <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{t('app.version')} 0.1.2</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{t('app.version')} 0.1.3</div>
                 </div>
               </div>
               <div className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{t('settings.aboutDesc')}</div>

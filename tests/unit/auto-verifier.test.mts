@@ -2,11 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AutoVerifier, cwdEquals } from '../../src/main/services/observation/auto-verifier.ts'
 import type { CompletedVerificationRecord, ControlledVerificationManager } from '../../src/main/services/controlled-verification-manager.ts'
-import type { ObservedAgentEvent } from '../../src/shared/observation-types.ts'
 import type { VerificationContract } from '../../src/shared/verification-types.ts'
+import type { ObservedAgentEventInternal } from '../../src/main/services/observation/agent-events.ts'
 
 const CONTRACT: VerificationContract = { title: 't', goal: 'g', allowedPaths: ['src'], forbiddenPaths: [], acceptanceCriteria: ['a'], knownRisks: [] }
-const END_EVENT: ObservedAgentEvent = { agentKind: 'claude-code', event: 'session:end', sessionId: 's1', cwd: 'C:\\proj', transcriptPath: null, timestamp: 1, raw: {} }
+const END_EVENT: ObservedAgentEventInternal = { agentKind: 'claude-code', event: 'session:end', sessionId: 's1', cwd: 'C:\\proj', displayPath: 'proj', transcriptPath: null, timestamp: 1, raw: {} }
 const RECORD = { execution: { state: 'executed' } } as unknown as CompletedVerificationRecord
 
 function makeVerifier(opts?: { workspace?: string | null; contract?: VerificationContract | null; record?: CompletedVerificationRecord | null }): { verifier: AutoVerifier; completed: CompletedVerificationRecord[] } {

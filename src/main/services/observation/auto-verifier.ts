@@ -2,8 +2,9 @@ import { ControlledVerificationManager, type CompletedVerificationRecord } from 
 import { REGISTERED_RECIPES } from './recipe-registry.ts'
 import { getRememberedContract } from './contract-store.ts'
 import { getSelectedWorkspaceBinding } from '../workspace-foundation/session-workspace.ts'
-import type { AutoVerifySettings, ObservedAgentEvent } from '../../../shared/observation-types.ts'
+import type { AutoVerifySettings } from '../../../shared/observation-types.ts'
 import type { VerificationContract } from '../../../shared/verification-types.ts'
+import type { ObservedAgentEventInternal } from './agent-events.ts'
 
 type WorkspaceLike = { cwd: string }
 
@@ -58,7 +59,7 @@ export class AutoVerifier {
     return this.lastReceipt
   }
 
-  async handleEvent(event: ObservedAgentEvent): Promise<void> {
+  async handleEvent(event: ObservedAgentEventInternal): Promise<void> {
     if (!this.settings.autoVerifyEnabled) return
     if (event.event !== 'session:end') return
 

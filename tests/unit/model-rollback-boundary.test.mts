@@ -45,11 +45,15 @@ test('managed snapshot names accept only app-generated formats', () => {
 test('valid temporary managed snapshot resolves inside the backup directory', () => {
   const fx = fixture()
   try {
-    assert.equal(realpathSync(resolveManagedSnapshotPath(fx.backupDir, fx.validName)), realpathSync(fx.validPath))
+    // Compare via the OS-native canonical form: realpathSync.native always
+    // returns long paths, so this is immune to 8.3 short-name representation
+    // differences on Windows (e.g. GitHub runners reporting RUNNER~1 vs the
+    // long C:\Users\runneradmin form).
+    assert.equal(realpathSync.native(resolveManagedSnapshotPath(fx.backupDir, fx.validName)), realpathSync.native(fx.validPath))
     if (process.platform === 'win32') {
       assert.equal(
-        realpathSync(resolveManagedSnapshotPath(fx.backupDir.toUpperCase(), fx.validName)),
-        realpathSync(fx.validPath)
+        realpathSync.native(resolveManagedSnapshotPath(fx.backupDir.toUpperCase(), fx.validName)),
+        realpathSync.native(fx.validPath)
       )
     }
   } finally {

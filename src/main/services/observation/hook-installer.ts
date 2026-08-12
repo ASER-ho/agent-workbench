@@ -84,25 +84,30 @@ export class HookInstaller {
   }
 
   uninstall(): { ok: boolean; restored: boolean } {
-    const base = this.read()
-    if (base === null) return { ok: false, restored: false }
-    // Prefer a full restore from the backup we created at install time.
+    const current = this.read()
+    if (current !== null) {
+      // Precise removal from the CURRENT settings, preserving any changes the
+      // user made after we installed. This is the safe default.
+      try {
+        const cleaned = this.stripMarker(current)
+        writeFileSync(this.opts.settingsPath, JSON.stringify(cleaned, null, 2), 'utf8')
+        return { ok: true, restored: false }
+      } catch {
+        return { ok: false, restored: false }
+      }
+    }
+    // Current settings are malformed/unreadable -> catastrophic recovery from
+    // the install-time backup. Never the default; only when we cannot operate.
     if (existsSync(this.opts.backupPath)) {
       try {
         const backup = JSON.parse(readFileSync(this.opts.backupPath, 'utf8')) as SettingsFile
         writeFileSync(this.opts.settingsPath, JSON.stringify(backup, null, 2), 'utf8')
         return { ok: true, restored: true }
       } catch {
-        /* fall through to marker stripping */
+        return { ok: false, restored: false }
       }
     }
-    try {
-      const cleaned = this.stripMarker(base)
-      writeFileSync(this.opts.settingsPath, JSON.stringify(cleaned, null, 2), 'utf8')
-      return { ok: true, restored: false }
-    } catch {
-      return { ok: false, restored: false }
-    }
+    return { ok: false, restored: false }
   }
 
   private read(): SettingsFile | null {

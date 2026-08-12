@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeHookEvent, normalizeTranscriptLine, displayPath } from '../../src/main/services/observation/agent-events.ts'
+import { normalizeHookEvent, normalizeTranscriptLine, displayPath, toPublicEvent } from '../../src/main/services/observation/agent-events.ts'
 
 test('hook: SessionStart maps to session:start (claude-code)', () => {
   const e = normalizeHookEvent({ hook_event_name: 'SessionStart', session_id: 's1', cwd: 'C:\\proj' }, true)
@@ -75,4 +75,43 @@ test('displayPath returns basename only', () => {
   assert.equal(displayPath('C:\\Users\\me\\workspace'), 'workspace')
   assert.equal(displayPath('/home/user/proj'), 'proj')
   assert.equal(displayPath('C:\\'), 'C:')
+})
+
+test('toPublicEvent drops cwd, transcriptPath, sourcePid and raw (trust boundary)', () => {
+  const e = normalizeHookEvent({
+    hook_event_name: 'SessionStart', session_id: 's1', cwd: 'C:\\Users\\secret\\proj',
+    transcript_path: 'C:\\Users\\secret\\.claude\\projects\\x.jsonl', source_pid: 1234
+  }, true)
+  assert.ok(e)
+  const pub = toPublicEvent(e!)
+  assert.equal(pub.sessionId, 's1')
+  assert.equal(pub.displayPath, 'proj')
+  assert.ok(!('cwd' in pub))
+  assert.ok(!('transcriptPath' in pub))
+  assert.ok(!('sourcePid' in pub))
+  assert.ok(!('raw' in pub))
+})
+
+test('transcript raw never retains tool output or message content', () => {
+  const line = JSON.stringify({
+    type: 'assistant', sessionId: 's1', cwd: 'C:\\proj',
+    message: { content: 'SECRET-MESSAGE' },
+    toolUseResult: { stdout: 'TOP-SECRET-OUTPUT' }
+  })
+  const e = normalizeTranscriptLine(line, 'claude-code')
+  assert.ok(e)
+  const rawStr = JSON.stringify(e!.raw)
+  assert.ok(!rawStr.includes('SECRET-MESSAGE'))
+  assert.ok(!rawStr.includes('TOP-SECRET-OUTPUT'))
+})
+
+test('codex transcript raw never retains tool arguments', () => {
+  const line = JSON.stringify({
+    timestamp: 1, type: 'response_item',
+    payload: { type: 'function_call', sessionId: 'x1', cwd: 'C:\\w', arguments: { command: 'secret-arg' } }
+  })
+  const e = normalizeTranscriptLine(line, 'codex')
+  assert.ok(e)
+  assert.equal(e!.event, 'tool:start')
+  assert.ok(!JSON.stringify(e!.raw).includes('secret-arg'))
 })

@@ -273,7 +273,7 @@ test('cutover removes the legacy AI-session terminal and provider/agent settings
   // About shows the real version + current product description, not the stale
   // "Claude Code workspace client" branding or the legacy terminal stack.
   await page.getByRole('button', { name: /关于/ }).click()
-  await expect(page.getByText(/版本\s*0\.1\.2/)).toBeVisible()
+  await expect(page.getByText(/版本\s*0\.1\.3/)).toBeVisible()
   const aboutBody = await page.locator('body').innerText()
   for (const forbidden of ['Claude Code', 'xterm.js', 'node-pty']) {
     expect(aboutBody, `unexpected stale About copy: ${forbidden}`).not.toContain(forbidden)

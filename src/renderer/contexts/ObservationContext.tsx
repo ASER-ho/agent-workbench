@@ -1,10 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { AutoVerifySettings, ObservedAgentEvent, ObservedSession, ObservationStatus, HookPreviewResult } from '../../shared/observation-types'
+import type { AutoVerifySettings, ObservedAgentEvent, ObservedSession, ObservationStatus, HookPreviewResult, VerificationCompletedPayload } from '../../shared/observation-types'
 
 interface ObservationContextValue {
   status: ObservationStatus | null
   sessions: ObservedSession[]
-  lastReceipt: unknown
+  lastReceipt: VerificationCompletedPayload | null
   refresh: () => Promise<void>
   enable: () => Promise<void>
   disable: () => Promise<void>
@@ -19,7 +19,7 @@ const ObservationContext = createContext<ObservationContextValue | null>(null)
 export function ObservationProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ObservationStatus | null>(null)
   const [sessions, setSessions] = useState<ObservedSession[]>([])
-  const [lastReceipt, setLastReceipt] = useState<unknown>(null)
+  const [lastReceipt, setLastReceipt] = useState<VerificationCompletedPayload | null>(null)
 
   const refresh = useCallback(async () => {
     const s = await window.api.observation.status()

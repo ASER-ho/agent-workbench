@@ -11,7 +11,7 @@ export default function ObservationPanel() {
 
   const status = obs.status
   const sessions = obs.sessions
-  const autoVerifyEnabled = false
+  const autoVerify = status?.autoVerify ?? { autoVerifyEnabled: false, workspaceOnly: true, recipeIds: ['project-default-check'] }
 
   const beginInstall = async () => {
     const p = await obs.installHooksPreview()
@@ -51,6 +51,12 @@ export default function ObservationPanel() {
           {status?.enabled ? t('observation.disable') : t('observation.enable')}
         </button>
       </div>
+
+      {status?.enabled && (
+        <p className="mt-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+          {t('observation.watchDirs')}: {status.watchedDirs.claudeProjects}, {status.watchedDirs.codexSessions}
+        </p>
+      )}
 
       {status?.lastError && (
         <p className="mt-2 text-[10px]" style={{ color: 'var(--failed)' }}>{t('observation.lastError')}: {status.lastError}</p>
@@ -111,12 +117,14 @@ export default function ObservationPanel() {
 
       <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--border-color)' }}>
         <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-          <input type="checkbox" checked={autoVerifyEnabled}
+          <input type="checkbox" checked={autoVerify.autoVerifyEnabled}
             onChange={(e) => void obs.setAutoVerify({ autoVerifyEnabled: e.target.checked, workspaceOnly: true, recipeIds: ['project-default-check'] })} />
           {t('observation.autoVerifyEnabled')}
         </label>
         {obs.lastReceipt ? (
-          <p className="mt-1 text-[10px]" style={{ color: 'var(--verified)' }}>{t('observation.lastReceipt')}: ✓</p>
+          <p className="mt-1 text-[10px]" style={{ color: 'var(--verified)' }}>
+            {t('observation.lastReceipt')}: {obs.lastReceipt.trigger === 'auto:session-end' ? t('observation.lastReceiptAuto') : t('observation.lastReceiptManual')}
+          </p>
         ) : (
           <p className="mt-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{t('observation.noContract')}</p>
         )}

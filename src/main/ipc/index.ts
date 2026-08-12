@@ -51,11 +51,11 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
 
   // Passive observation: transcript polling + loopback hook server. Push events
   // are forwarded to the renderer; the renderer can never reach the agent.
+  // Observation is OFF until the user explicitly enables it from the UI.
   const observationManager = new ObservationManager({
     onSessionsChanged: (sessions) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, sessions),
-    onVerificationCompleted: (receipt) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, receipt),
+    onVerificationCompleted: (payload) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, payload),
     onEvent: (event) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_EVENT, event)
   })
-  void observationManager.enable()
   registerObservationHandlers(observationManager)
 }
