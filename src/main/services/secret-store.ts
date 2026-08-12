@@ -7,10 +7,34 @@ const ALGORITHM = 'aes-256-gcm'
 const KEY_LENGTH = 32
 const IV_LENGTH = 12
 const SALT_LENGTH = 16
-const FILE_VERSION = 1
 
-interface EncryptedFile {
-  version: number
+interface SecretsPayload {
+  secrets: Record<string, string>
+}
+
+/**
+ * Storage format v2: Electron safeStorage protects the payload.
+ * On Windows this is DPAPI (CurrentUser), on macOS the Keychain, on Linux
+ * libsecret. A process without access to the OS secret store cannot decrypt
+ * the file, unlike the legacy scrypt derivation which was a function of the
+ * machine hostname and username.
+ */
+interface SafeStorageFile {
+  version: 2
+  protection: 'safe-storage'
+  /** base64 of safeStorage.encryptString(JSON.stringify(payload)). */
+  encrypted: string
+  updatedAt: string
+}
+
+/**
+ * Legacy storage format v1: AES-256-GCM keyed by scryptSync(tag, salt), where
+ * tag is derived from hostname + username. Kept for reading existing files and
+ * as a write fallback on platforms without an OS keyring. New writes use v2
+ * whenever safeStorage is available.
+ */
+interface ScryptFile {
+  version: 1
   salt: string
   iv: string
   authTag: string
@@ -18,8 +42,27 @@ interface EncryptedFile {
   updatedAt: string
 }
 
-interface SecretsPayload {
-  secrets: Record<string, string>
+type StoredFile = SafeStorageFile | ScryptFile
+
+/**
+ * Lazy Electron safeStorage accessor. Returns null when the module is loaded
+ * outside Electron (e.g. a Node test process) or when the platform exposes no
+ * OS secret store. This keeps FileSecretStore constructible and testable in
+ * plain Node, where it falls back to the scrypt path.
+ */
+let safeStorageRef: Electron.SafeStorage | null | undefined
+function getSafeStorage(): Electron.SafeStorage | null {
+  if (safeStorageRef === undefined) {
+    try {
+      // electron is externalized in the main-process bundle; in a plain Node
+      // test process this require throws and is caught here.
+      const electron = require('electron') as typeof import('electron')
+      safeStorageRef = electron.safeStorage ?? null
+    } catch {
+      safeStorageRef = null
+    }
+  }
+  return safeStorageRef
 }
 
 export interface SecretStore {
@@ -32,53 +75,93 @@ export interface SecretStore {
 
 export class FileSecretStore implements SecretStore {
   private readonly path: string
+  /** Force the legacy scrypt path regardless of safeStorage availability. */
+  private readonly forceScrypt: boolean
 
-  constructor(opts?: { storagePath?: string }) {
+  constructor(opts?: { storagePath?: string; useScryptFallback?: boolean }) {
     this.path = opts?.storagePath || join(homedir(), '.agent-workbench', 'secrets.enc')
+    this.forceScrypt = opts?.useScryptFallback ?? false
   }
 
-  private deriveKey(salt: Buffer): Buffer {
-    const tag = `agent-workbench-v1:${hostname()}:${userInfo().username}`
-    return scryptSync(tag, salt, KEY_LENGTH)
+  private canUseSafeStorage(): boolean {
+    if (this.forceScrypt) return false
+    const storage = getSafeStorage()
+    if (!storage) return false
+    try {
+      return storage.isEncryptionAvailable()
+    } catch {
+      return false
+    }
   }
 
   private readPayload(): SecretsPayload | null {
     if (!existsSync(this.path)) return null
     try {
-      const raw = JSON.parse(readFileSync(this.path, 'utf-8')) as EncryptedFile
-      const salt = Buffer.from(raw.salt, 'base64')
-      const iv = Buffer.from(raw.iv, 'base64')
-      const authTag = Buffer.from(raw.authTag, 'base64')
-      const key = this.deriveKey(salt)
-      const decipher = createDecipheriv(ALGORITHM, key, iv)
-      decipher.setAuthTag(authTag)
-      const decrypted = Buffer.concat([
-        decipher.update(raw.ciphertext, 'base64'),
-        decipher.final()
-      ]).toString('utf-8')
-      return JSON.parse(decrypted)
-    } catch { throw new Error('SecretStore corrupted or cannot be decrypted') }
+      const raw = JSON.parse(readFileSync(this.path, 'utf-8')) as StoredFile
+      if (raw.version === 2 && raw.protection === 'safe-storage') {
+        const storage = getSafeStorage()
+        if (!storage) throw new Error('safeStorage unavailable for stored secrets')
+        const decrypted = storage.decryptString(Buffer.from(raw.encrypted, 'base64'))
+        return JSON.parse(decrypted) as SecretsPayload
+      }
+      if (raw.version === 1) {
+        return this.decryptScrypt(raw)
+      }
+      return null
+    } catch {
+      throw new Error('SecretStore corrupted or cannot be decrypted')
+    }
+  }
+
+  private decryptScrypt(file: ScryptFile): SecretsPayload {
+    const salt = Buffer.from(file.salt, 'base64')
+    const iv = Buffer.from(file.iv, 'base64')
+    const authTag = Buffer.from(file.authTag, 'base64')
+    const key = this.deriveKey(salt)
+    const decipher = createDecipheriv(ALGORITHM, key, iv)
+    decipher.setAuthTag(authTag)
+    const decrypted = Buffer.concat([
+      decipher.update(file.ciphertext, 'base64'),
+      decipher.final()
+    ]).toString('utf-8')
+    return JSON.parse(decrypted)
   }
 
   private writePayload(data: SecretsPayload): void {
     mkdirSync(dirname(this.path), { recursive: true })
-    const salt = randomBytes(SALT_LENGTH)
-    const key = this.deriveKey(salt)
-    const iv = randomBytes(IV_LENGTH)
-    const cipher = createCipheriv(ALGORITHM, key, iv)
-    const plaintext = JSON.stringify(data)
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()])
-    const file: EncryptedFile = {
-      version: FILE_VERSION,
-      salt: salt.toString('base64'),
-      iv: iv.toString('base64'),
-      authTag: cipher.getAuthTag().toString('base64'),
-      ciphertext: encrypted.toString('base64'),
-      updatedAt: new Date().toISOString()
+    const payload = JSON.stringify(data)
+    let file: StoredFile
+    if (this.canUseSafeStorage()) {
+      const storage = getSafeStorage()
+      const encrypted = storage!.encryptString(payload).toString('base64')
+      file = { version: 2, protection: 'safe-storage', encrypted, updatedAt: new Date().toISOString() }
+    } else {
+      file = this.encryptScrypt(payload)
     }
     const tmp = this.path + '.tmp'
     writeFileSync(tmp, JSON.stringify(file), 'utf-8')
     try { renameSync(tmp, this.path) } catch { /* rename failed, old file intact, tmp left for recovery */ }
+  }
+
+  private encryptScrypt(payload: string): ScryptFile {
+    const salt = randomBytes(SALT_LENGTH)
+    const key = this.deriveKey(salt)
+    const iv = randomBytes(IV_LENGTH)
+    const cipher = createCipheriv(ALGORITHM, key, iv)
+    const ciphertext = Buffer.concat([cipher.update(payload, 'utf-8'), cipher.final()])
+    return {
+      version: 1,
+      salt: salt.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: cipher.getAuthTag().toString('base64'),
+      ciphertext: ciphertext.toString('base64'),
+      updatedAt: new Date().toISOString()
+    }
+  }
+
+  private deriveKey(salt: Buffer): Buffer {
+    const tag = `agent-workbench-v1:${hostname()}:${userInfo().username}`
+    return scryptSync(tag, salt, KEY_LENGTH)
   }
 
   async setSecret(ref: string, value: string): Promise<void> {

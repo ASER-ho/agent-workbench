@@ -1,85 +1,19 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { useView, type AppView } from '../../contexts/ViewContext'
 import { useLocale } from '../../contexts/LocaleContext'
+import { useMediaQuery } from '../../lib/useMediaQuery'
+import {
+  WorkspaceIcon, VerificationIcon, EnvironmentIcon, SettingsIcon,
+  CollapseChevron, ExpandChevron
+} from '../common/icons'
 
 const COLLAPSED_WIDTH = 52
 
-/** True while the given CSS media query matches. Used for the responsive auto-collapse. */
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-    return window.matchMedia(query).matches
-  })
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const mql = window.matchMedia(query)
-    const onChange = () => setMatches(mql.matches)
-    onChange()
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [query])
-  return matches
-}
-
-function WorkspaceIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="2" width="5" height="5" rx="1" />
-      <rect x="9" y="2" width="5" height="5" rx="1" />
-      <rect x="2" y="9" width="5" height="5" rx="1" />
-      <rect x="9" y="9" width="5" height="5" rx="1" />
-    </svg>
-  )
-}
-
-function VerificationIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="8" r="6" />
-      <path d="M5.5 8.2 7.2 9.9 10.6 6.4" />
-    </svg>
-  )
-}
-
-function EnvironmentIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 10.5a6.5 6.5 0 1 1 11 0" />
-      <path d="M8 10.5 10.5 7" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" />
-    </svg>
-  )
-}
-
-function CollapseChevron() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 3 5 8l5 5" />
-    </svg>
-  )
-}
-
-function ExpandChevron() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 3l5 5-5 5" />
-    </svg>
-  )
-}
-
 const NAV_ITEMS: Array<{ view: AppView; labelKey: string; icon: ReactNode }> = [
-  { view: 'workspace', labelKey: 'rail.workspace', icon: <WorkspaceIcon /> },
-  { view: 'verification', labelKey: 'rail.verification', icon: <VerificationIcon /> },
-  { view: 'environment', labelKey: 'rail.environment', icon: <EnvironmentIcon /> },
-  { view: 'settings', labelKey: 'rail.settings', icon: <SettingsIcon /> }
+  { view: 'workspace', labelKey: 'rail.workspace', icon: <WorkspaceIcon size={16} /> },
+  { view: 'verification', labelKey: 'rail.verification', icon: <VerificationIcon size={16} /> },
+  { view: 'environment', labelKey: 'rail.environment', icon: <EnvironmentIcon size={16} /> },
+  { view: 'settings', labelKey: 'rail.settings', icon: <SettingsIcon size={16} /> }
 ]
 
 export default function Rail() {

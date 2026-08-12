@@ -150,5 +150,12 @@
 
   "common.files": "files",
   "common.version": "Version",
-  "common.loading": "Loading..."
+  "common.loading": "Loading...",
+
+  "diag.next.title": "What to check next",
+  "diag.next.node": "Check that Node.js is installed and reachable from PATH",
+  "diag.next.npm": "Check that npm is installed and usable",
+  "diag.next.git": "Check that Git is installed and reachable",
+  "diag.next.claude": "(Optional) Claude CLI detection; does not affect verification",
+  "diag.next.generic": "Check this configuration and re-run detection"
 }

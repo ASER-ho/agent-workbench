@@ -4,12 +4,17 @@ import { useTabs } from '../../contexts/TabContext'
 import { useLocale } from '../../contexts/LocaleContext'
 import { useSidebar } from '../../contexts/SidebarContext'
 import ContextMenu, { type ContextMenuItem } from '../common/ContextMenu'
+import {
+  MemoryIcon, SkillsIcon, FolderIcon, SettingsIcon, FileIcon,
+  MarkdownIcon, JsonIcon, NewFileIcon, NewFolderIcon, RenameIcon,
+  DeleteIcon, MenuIcon, RefreshIcon, BackChevron, FolderOpenIcon
+} from '../common/icons'
 
-const SECTION_ICONS: Record<string, string> = {
-  Memory: '📝',
-  Skills: '🧠',
-  Projects: '📁',
-  Config: '⚙️'
+const SECTION_ICONS: Record<string, ReactNode> = {
+  Memory: <MemoryIcon />,
+  Skills: <SkillsIcon />,
+  Projects: <FolderIcon />,
+  Config: <SettingsIcon />
 }
 
 const SECTION_KEYS: Record<string, string> = {
@@ -45,8 +50,8 @@ function getFileType(fileName: string, sectionName: string): 'memory' | 'skill' 
   return 'memory'
 }
 
-function getIcon(sectionName: string): string {
-  return SECTION_ICONS[sectionName] ?? '📄'
+function getIcon(sectionName: string): ReactNode {
+  return SECTION_ICONS[sectionName] ?? <FileIcon />
 }
 
 export default function Sidebar() {
@@ -154,7 +159,11 @@ export default function Sidebar() {
 
   const sectionName = (name: string) => {
     const key = SECTION_KEYS[name]
-    return key ? `${SECTION_ICONS[name] ?? '📄'} ${t(key)}` : `📄 ${isPathDerivedId(name) ? t('sidebar.currentWorkspace') : name}`
+    return key ? (
+      <span className="flex items-center gap-1.5">{SECTION_ICONS[name] ?? <FileIcon />}<span>{t(key)}</span></span>
+    ) : (
+      <span className="flex items-center gap-1.5"><FileIcon /><span>{isPathDerivedId(name) ? t('sidebar.currentWorkspace') : name}</span></span>
+    )
   }
 
   const renderItem = (
@@ -167,8 +176,8 @@ export default function Sidebar() {
     const isDir = item.isDirectory
 
     if (isDir) {
-      const icon = depth === 0 ? '📂' : '📁'
       const expanded = expandedDirs.has(item.path)
+      const icon = expanded ? <FolderOpenIcon /> : <FolderIcon />
       const children = dirCache[item.path]
 
       return (
@@ -177,10 +186,10 @@ export default function Sidebar() {
             className={`sidebar-item ${isActive ? 'active' : ''}`}
             onClick={() => toggleDir(item.path)}
             onContextMenu={(e) => onContextMenu(e, [
-              { label: t('context.newFile'), icon: '📄', onClick: () => setCreating({ parentDir: item.path, isDir: false }) },
-              { label: t('context.newFolder'), icon: '📁', onClick: () => setCreating({ parentDir: item.path, isDir: true }) },
-              { label: t('context.rename'), icon: '✏️', onClick: () => setRenaming({ path: item.path, name: item.name }) },
-              { label: t('context.delete'), icon: '🗑️', danger: true, onClick: () => handleDelete(item.path) },
+              { label: t('context.newFile'), icon: <NewFileIcon />, onClick: () => setCreating({ parentDir: item.path, isDir: false }) },
+              { label: t('context.newFolder'), icon: <NewFolderIcon />, onClick: () => setCreating({ parentDir: item.path, isDir: true }) },
+              { label: t('context.rename'), icon: <RenameIcon />, onClick: () => setRenaming({ path: item.path, name: item.name }) },
+              { label: t('context.delete'), icon: <DeleteIcon />, danger: true, onClick: () => handleDelete(item.path) },
             ])}
             style={{ paddingLeft: padLeft }}
           >
@@ -188,7 +197,7 @@ export default function Sidebar() {
             <span className="mr-1">{icon}</span>
             {renaming?.path === item.path ? (
               <input
-                className="bg-gray-700 text-gray-200 text-[11px] px-1 py-0 rounded outline-none border border-indigo-500 flex-1 min-w-0"
+                className="text-[11px] px-1 py-0 rounded outline-none border flex-1 min-w-0" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--indigo)' }}
                 defaultValue={item.name}
                 autoFocus
                 onBlur={(e) => { handleRename(item.path, e.target.value); setRenaming(null) }}
@@ -217,14 +226,14 @@ export default function Sidebar() {
               )}
               {children.map(child => renderItem(child, sectionName, depth + 1))}
               {children.length === 0 && (
-                <div className="px-6 py-1.5 text-[10px] text-gray-600 italic" style={{ paddingLeft: padLeft + 16 }}>
+                <div className="px-6 py-1.5 text-[10px] italic" style={{ paddingLeft: padLeft + 16, color: 'var(--text-tertiary)' }}>
                   {t('sidebar.empty')}
                 </div>
               )}
             </div>
           )}
           {expanded && !children && (
-            <div className="px-6 py-1.5 text-[10px] text-gray-600 italic" style={{ paddingLeft: padLeft + 16 }}>
+            <div className="px-6 py-1.5 text-[10px] italic" style={{ paddingLeft: padLeft + 16, color: 'var(--text-tertiary)' }}>
               <span className="loading-spinner w-2.5 h-2.5 inline-block" />
             </div>
           )}
@@ -238,19 +247,19 @@ export default function Sidebar() {
           className={`sidebar-item ${isActive ? 'active' : ''}`}
           onClick={() => handleFileClick(item.path, (isPathDerivedId(item.name) ? t('sidebar.currentWorkspace') : item.name), sectionName)}
           onContextMenu={(e) => onContextMenu(e, [
-            { label: t('context.rename'), icon: '✏️', onClick: () => setRenaming({ path: item.path, name: item.name }) },
-            { label: t('context.delete'), icon: '🗑️', danger: true, onClick: () => handleDelete(item.path) },
+            { label: t('context.rename'), icon: <RenameIcon />, onClick: () => setRenaming({ path: item.path, name: item.name }) },
+            { label: t('context.delete'), icon: <DeleteIcon />, danger: true, onClick: () => handleDelete(item.path) },
           ])}
           style={{ paddingLeft: padLeft }}
         >
-          <span className="mr-1">
-            {item.name.endsWith('.md') ? '📄' :
-             item.name.endsWith('.jsonl') ? '📋' :
-             item.name.endsWith('.json') ? '⚙️' : '📄'}
+          <span className="mr-1 flex items-center">
+            {item.name.endsWith('.md') ? <MarkdownIcon /> :
+             item.name.endsWith('.jsonl') || item.name.endsWith('.json') ? <JsonIcon /> :
+             <FileIcon />}
           </span>
           {renaming?.path === item.path ? (
             <input
-              className="bg-gray-700 text-gray-200 text-[11px] px-1 py-0 rounded outline-none border border-indigo-500 flex-1 min-w-0"
+              className="text-[11px] px-1 py-0 rounded outline-none border flex-1 min-w-0" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--indigo)' }}
               defaultValue={item.name}
               autoFocus
               onBlur={(e) => { handleRename(item.path, e.target.value); setRenaming(null) }}
@@ -272,7 +281,7 @@ export default function Sidebar() {
     return (
       <div className="flex flex-col gap-2 p-4">
         <div className="loading-spinner mx-auto" />
-        <p className="text-xs text-gray-500 text-center">{t('sidebar.loading')}</p>
+        <p className="text-xs text-center" style={{ color: 'var(--text-secondary)' }}>{t('sidebar.loading')}</p>
       </div>
     )
   }
@@ -280,7 +289,7 @@ export default function Sidebar() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 p-4">
-        <div className="text-red-400 text-xs text-center">{error}</div>
+        <div className="text-xs text-center" style={{ color: 'var(--failed)' }}>{error}</div>
         <button onClick={refresh} className="btn btn-primary text-xs">{t('sidebar.retry')}</button>
       </div>
     )
@@ -292,22 +301,22 @@ export default function Sidebar() {
     }}>
       <div className="px-3 py-2 flex items-center justify-between gap-1">
         {collapsed ? (
-          <button onClick={toggleCollapse} className="w-full text-center text-gray-500 hover:text-white p-1 rounded hover:bg-gray-800 transition-colors" title={t('sidebar.expand')}>
-            ☰
+          <button onClick={toggleCollapse} className="w-full flex items-center justify-center p-1 rounded transition-colors hover:bg-gray-800 hover:text-white" style={{ color: 'var(--text-secondary)' }} title={t('sidebar.expand')}>
+            <MenuIcon size={14} />
           </button>
         ) : (
           <>
-            <h1 className="text-sm font-semibold text-gray-200">{t('sidebar.workspace')}</h1>
+            <h1 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('sidebar.workspace')}</h1>
             <div className="flex items-center gap-1">
               <button onClick={refresh}
-                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-white rounded hover:bg-gray-800 transition-colors"
+                className="w-5 h-5 flex items-center justify-center rounded transition-colors hover:bg-gray-800 hover:text-white" style={{ color: 'var(--text-secondary)' }}
                 title={t("sidebar.refresh")}>
-                ↻
+                <RefreshIcon size={13} />
               </button>
               <button onClick={toggleCollapse}
-                className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-white rounded hover:bg-gray-800 transition-colors"
+                className="w-5 h-5 flex items-center justify-center rounded transition-colors hover:bg-gray-800 hover:text-white" style={{ color: 'var(--text-secondary)' }}
                 title={t('sidebar.collapse')}>
-                ◀
+                <BackChevron size={13} />
               </button>
             </div>
           </>
@@ -325,22 +334,22 @@ export default function Sidebar() {
                   className="sidebar-section-header"
                   onClick={() => toggleSection(section.name)}
                   onContextMenu={(e) => onContextMenu(e, [
-                    { label: t('context.newFile'), icon: '📄', onClick: () => setCreating({ parentDir: section.path, isDir: false }) },
-                    { label: t('context.newFolder'), icon: '📁', onClick: () => setCreating({ parentDir: section.path, isDir: true }) },
+                    { label: t('context.newFile'), icon: <NewFileIcon />, onClick: () => setCreating({ parentDir: section.path, isDir: false }) },
+                    { label: t('context.newFolder'), icon: <NewFolderIcon />, onClick: () => setCreating({ parentDir: section.path, isDir: true }) },
                   ])}
                 >
                   <span>{sectionName(section.name)}</span>
-                  <span className="text-gray-600 text-[10px]">{expandedSections.has(section.name) ? '▾' : '▸'}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{expandedSections.has(section.name) ? '▾' : '▸'}</span>
                 </div>
 
                 {expandedSections.has(section.name) && (
                   <div className="mb-1">
                     {section.items.length === 0 ? (
                       <div className="flex flex-col items-center py-3 gap-2">
-                        <div className="px-6 py-1 text-xs text-gray-600 italic">{t('sidebar.empty')}</div>
+                        <div className="px-6 py-1 text-xs italic" style={{ color: 'var(--text-tertiary)' }}>{t('sidebar.empty')}</div>
                         <button
                           onClick={() => setCreating({ parentDir: section.path, isDir: false })}
-                          className="text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline">{t('sidebar.newFile')}</button>
+                          className="text-[10px] hover:underline" style={{ color: 'var(--indigo)' }}>{t('sidebar.newFile')}</button>
                       </div>
                     ) : (
                       <>
@@ -401,10 +410,10 @@ function InlineCreateInput({
 
   return (
     <div style={{ paddingLeft: padLeft }} className="flex items-center gap-1 px-3 py-1">
-      <span className="text-gray-500 text-[10px]">{isDir ? '📁' : '📄'}</span>
+      <span className="flex items-center" style={{ color: 'var(--text-secondary)' }}>{isDir ? <NewFolderIcon /> : <NewFileIcon />}</span>
       <input
         ref={inputRef}
-        className="bg-gray-700 text-gray-200 text-[11px] px-1 py-0.5 rounded outline-none border border-indigo-500 flex-1 min-w-0"
+        className="text-[11px] px-1 py-0.5 rounded outline-none border flex-1 min-w-0" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--indigo)' }}
         placeholder={isDir ? t('sidebar.newFolder') : t('sidebar.newFileAction')}
         value={value}
         onChange={(e) => setValue(e.target.value)}

@@ -150,5 +150,12 @@
 
   "common.files": "个文件",
   "common.version": "版本",
-  "common.loading": "加载中..."
+  "common.loading": "加载中...",
+
+  "diag.next.title": "下一步检查",
+  "diag.next.node": "检查 Node.js 是否安装并可从 PATH 访问",
+  "diag.next.npm": "检查 npm 是否安装并可用",
+  "diag.next.git": "检查 Git 是否安装并可访问",
+  "diag.next.claude": "（可选）检测 Claude CLI；不影响验证",
+  "diag.next.generic": "检查该项配置后重新检测"
 }

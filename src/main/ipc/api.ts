@@ -26,6 +26,7 @@ function backupPath(timestamp: string): string {
   return join(getBackupDir(), `settings.json.backup.${timestamp}`)
 }
 
+/** Mask shown in place of a stored API key. The real key never crosses IPC. */
 function derivePrefix(key: string): string {
   if (!key) return ''
   return '********'

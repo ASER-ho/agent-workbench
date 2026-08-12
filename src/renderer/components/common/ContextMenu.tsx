@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 
 export interface ContextMenuItem {
   label: string
-  icon?: string
+  icon?: ReactNode
   shortcut?: string
   danger?: boolean
   divider?: boolean

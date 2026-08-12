@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useView } from '../../contexts/ViewContext'
 import { useLocale } from '../../contexts/LocaleContext'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import type { DiagnosticReport } from '../../../shared/ipc-types'
 import StatusBar from './StatusBar'
 import Rail from './Rail'
@@ -12,23 +13,6 @@ import ReadyCheckPanel from '../editors/ReadyCheckPanel'
 import DiagnosticsPanel from '../editors/DiagnosticsPanel'
 import SettingsEditor from '../editors/SettingsEditor'
 
-/** True while the given CSS media query matches. Used for responsive shell behavior. */
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-    return window.matchMedia(query).matches
-  })
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const mql = window.matchMedia(query)
-    const onChange = () => setMatches(mql.matches)
-    onChange()
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [query])
-  return matches
-}
-
 /**
  * Environment view: readiness checks + full diagnostics, stacked in a
  * scrollable, centered page container. Core expression is Workspace / Node /
@@ -36,26 +20,24 @@ function useMediaQuery(query: string): boolean {
  * appears only as an advanced diagnostic item (never a top-level setting).
  */
 /** Real, per-item "what to check next" hints for failed diagnostics (renderer-only, no auto-repair). */
-function diagnosticsNextSteps(report: DiagnosticReport, locale: 'zh' | 'en'): { id: string; hint: string }[] {
-  const tr = (zh: string, en: string) => (locale === 'zh' ? zh : en)
-  const out: { id: string; hint: string }[] = []
+function diagnosticsNextSteps(report: DiagnosticReport): { id: string; hintKey: string }[] {
+  const out: { id: string; hintKey: string }[] = []
   for (const item of report.items) {
     if (item.status !== 'error') continue
     const id = item.id
-    let hint: string
-    if (id === 'node-path' || id === 'node-version' || id.startsWith('node-')) hint = tr('检查 Node.js 是否安装并可从 PATH 访问', 'Check that Node.js is installed and reachable from PATH')
-    else if (id === 'npm-path' || id === 'npm-version' || id.startsWith('npm')) hint = tr('检查 npm 是否安装并可用', 'Check that npm is installed and usable')
-    else if (id.startsWith('git')) hint = tr('检查 Git 是否安装并可访问', 'Check that Git is installed and reachable')
-    else if (id.startsWith('claude')) hint = tr('（可选）检测 Claude CLI；不影响验证', '(Optional) Claude CLI detection; does not affect verification')
-    else hint = tr('检查该项配置后重新检测', 'Check this configuration and re-run detection')
-    out.push({ id, hint })
+    let hintKey: string
+    if (id === 'node-path' || id === 'node-version' || id.startsWith('node-')) hintKey = 'diag.next.node'
+    else if (id === 'npm-path' || id === 'npm-version' || id.startsWith('npm')) hintKey = 'diag.next.npm'
+    else if (id.startsWith('git')) hintKey = 'diag.next.git'
+    else if (id.startsWith('claude')) hintKey = 'diag.next.claude'
+    else hintKey = 'diag.next.generic'
+    out.push({ id, hintKey })
   }
   return out
 }
 
 function EnvironmentView() {
-  const { t, locale } = useLocale()
-  const tr = (zh: string, en: string) => (locale === 'zh' ? zh : en)
+  const { t } = useLocale()
   const tRef = useRef(t)
   useEffect(() => { tRef.current = t }, [t])
   const [report, setReport] = useState<DiagnosticReport | null>(null)
@@ -81,7 +63,7 @@ function EnvironmentView() {
 
   useEffect(() => { void run() }, [run])
 
-  const nextSteps = report ? diagnosticsNextSteps(report, locale) : []
+  const nextSteps = report ? diagnosticsNextSteps(report) : []
 
   return (
     <div className="h-full overflow-y-auto px-6 py-6">
@@ -93,11 +75,11 @@ function EnvironmentView() {
             style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}
           >
             <div className="font-semibold" style={{ color: 'var(--warn)' }}>
-              {tr('下一步检查', 'What to check next')}
+              {t('diag.next.title')}
             </div>
             <ul className="mt-1.5 space-y-1" style={{ color: 'var(--text-secondary)' }}>
               {nextSteps.map(s => (
-                <li key={s.id}>• {s.id}：{s.hint}</li>
+                <li key={s.id}>• {s.id}：{t(s.hintKey)}</li>
               ))}
             </ul>
           </div>

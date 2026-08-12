@@ -31,6 +31,7 @@
     "test:api-boundary": "node --experimental-strip-types --no-warnings --test tests/unit/api-url-boundary.test.mts",
     "test:verification": "node --experimental-strip-types --no-warnings --test tests/unit/verification-contract.test.mts tests/unit/git-verification.test.mts tests/unit/inspection-guard.test.mts tests/unit/workspace-foundation.test.mts",
     "test:criterion": "node --experimental-strip-types --no-warnings --test tests/unit/criterion-evaluator.test.mts tests/unit/evidence-binding.test.mts",
+    "test:secret-store": "node --experimental-strip-types --no-warnings --test tests/unit/secret-store.test.mts",
     "test:controlled-verification": "node --experimental-strip-types --no-warnings --test tests/unit/controlled-verification-manager.test.mts",
     "test:r2b2b-r2c": "node --experimental-strip-types --no-warnings --test tests/unit/evidence-freshness.test.mts tests/unit/verification-subject-snapshot.test.mts tests/unit/node-recipe.test.mts tests/unit/controlled-verification-manager.test.mts",
     "test:r2d": "node --experimental-strip-types --no-warnings --test tests/unit/overall-verdict.test.mts tests/unit/verification-receipt.test.mts tests/unit/handoff-markdown.test.mts tests/unit/verification-export-service.test.mts"
@@ -69,7 +70,18 @@
     },
     "files": [
       "out/**/*",
-      "!**/*.map"
+      "!**/*.map",
+      "!node_modules/node-pty/prebuilds/darwin-arm64/**",
+      "!node_modules/node-pty/prebuilds/darwin-x64/**",
+      "!node_modules/node-pty/prebuilds/linux-arm64/**",
+      "!node_modules/node-pty/prebuilds/linux-x64/**",
+      "!node_modules/node-pty/prebuilds/win32-arm64/**",
+      "!node_modules/node-pty/third_party/conpty/1.25.260303002/win10-arm64/**"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "zh-TW",
+      "en-US"
     ],
     "win": {
       "target": [
