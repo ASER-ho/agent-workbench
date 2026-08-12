@@ -1,0 +1,4 @@
+68a335ddc51fdccd2dbd554ab63a4808b1bff5aaa0bd50622f4ccf2e02f0b35f  dist-0.1.2/Agent Workbench Setup 0.1.2.exe
+3afd7c7467192d0b67c5f585881395338edfa3f318c8ac844c24f33b37735be2  dist-0.1.2/Agent Workbench Setup 0.1.2.exe.blockmap
+5711f5ce3cc0e0354fab74bc1e60b19b72e8bc56fdac165f27fda497e7a80b04  dist-0.1.2/win-unpacked/resources/app.asar
+ffca14a7a1bc43319f45e9867ecfc6810de6bb777c151ea1142b3b8acb4df5b3  dist-0.1.2/win-unpacked/Agent Workbench.exe
