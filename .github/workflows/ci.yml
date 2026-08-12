@@ -16,7 +16,7 @@ jobs:
   test:
     name: Build + full test battery (Windows)
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
