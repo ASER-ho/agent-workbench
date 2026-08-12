@@ -31,7 +31,7 @@ Base: `main` @ `1fa244a` (untouched)
 | `npm run test:static` | 0 | 22 tests, 22 pass, 0 fail |
 | `npx playwright test -c playwright.electron.config.ts controlled-verification.e2e.spec.ts` | 0 | 3 passed |
 | `npm run test:electron` | 0 | 32 passed |
-| Regression: `test:unit` `test:fs` `test:session` `test:action` `test:rollback` `test:navigation` `test:ipc-sender` `test:api-boundary` `test:brand` `test:smoke-harness` `test:credentials` | 0 | all green |
+| Regression: `test:paths` `test:fs` `test:session` `test:action` `test:rollback` `test:navigation` `test:ipc-sender` `test:api-boundary` `test:brand` `test:smoke-harness` `test:credentials` | 0 | all green |
 
 No real Agent launched. No push/tag/release performed.
 

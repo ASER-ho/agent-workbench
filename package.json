@@ -2,9 +2,19 @@
   "name": "agent-workbench-desktop",
   "version": "0.1.2",
   "license": "MIT",
+  "author": "Agent Workbench contributors",
   "description": "Independent local desktop workbench for AI coding agents",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ASER-ho/agent-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ASER-ho/agent-workbench/issues"
+  },
+  "homepage": "https://github.com/ASER-ho/agent-workbench",
   "main": "./out/main/index.js",
   "scripts": {
+    "test": "node scripts/run-all-tests.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -12,7 +22,7 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "smoke": "playwright test smoke.spec.ts",
-    "test:unit": "node --experimental-strip-types --no-warnings --test tests/unit/fixture-paths.test.mts",
+    "test:paths": "node --experimental-strip-types --no-warnings --test tests/unit/fixture-paths.test.mts",
     "test:fs": "node --experimental-strip-types --no-warnings --test tests/unit/fs-ipc-boundary.test.mts",
     "test:session": "node --experimental-strip-types --no-warnings --test tests/unit/stub-session.test.mts",
     "test:action": "node --experimental-strip-types --no-warnings --test tests/unit/controlled-action.test.mts",

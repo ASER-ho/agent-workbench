@@ -60,7 +60,13 @@ function localizeReadinessText(text: string | undefined, t: (k: string) => strin
     'Capsule could not be restored. Project context may be incomplete.': 'readiness.raw.capsuleDetail',
     '为空': 'diag.sEmpty'
   }
-  return keys[text] ? t(keys[text]) : text
+  if (keys[text]) return t(keys[text])
+  // Partial: "包含 N 个字段" (settings env field count) — same pattern as DiagnosticsPanel.
+  if (text.startsWith('包含 ') && text.endsWith(' 个字段')) {
+    const n = text.replace('包含 ', '').replace(' 个字段', '')
+    return t('diag.sContainsFields').replace('{n}', n)
+  }
+  return text
 }
 
 export default function ReadyCheckPanel() {

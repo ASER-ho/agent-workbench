@@ -53,7 +53,8 @@ npm run build
 Local verification:
 
 ```powershell
-npm run test:unit
+npm test
+npm run test:paths
 npm run test:fs
 npm run test:session
 npm run test:action

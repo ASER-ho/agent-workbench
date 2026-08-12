@@ -41,6 +41,17 @@ Get-FileHash -LiteralPath '.\Agent Workbench Setup 0.1.0-alpha.1.exe.blockmap' -
 
 The current Alpha installer is not code-signed, so Windows may show an unknown-publisher or reputation warning. A valid SHA-256 match confirms that the file matches the reviewed release artifact; it does not replace operating-system code signing.
 
+## SmartScreen / Unknown-publisher warning
+
+The installers are not code-signed, so on first launch Windows SmartScreen may show **"Windows protected your PC"** (unknown publisher). When you have already verified the SHA-256 against the release notes, the correct response is:
+
+1. In the SmartScreen dialog, click **More info**.
+2. Click **Run anyway**.
+
+To skip the warning for a downloaded file without changing global policy, right-click the `.exe` in File Explorer, choose **Properties**, and check **Unblock** (only present when the file came from the network zone), then click **OK** and run the installer.
+
+The "Unblock" attribute is per-file metadata, not a security bypass — the file must still match the verified SHA-256 above.
+
 ## Uninstall
 
 Use Windows Settings > Apps > Installed apps > Agent Workbench > Uninstall, or run `Uninstall Agent Workbench.exe` from the installation directory.
