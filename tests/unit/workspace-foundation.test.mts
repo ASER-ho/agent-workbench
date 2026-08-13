@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { isUncOrDevicePath } from '../../src/main/services/workspace-foundation/path-validation.ts'
-import { createWorkspaceBinding } from '../../src/main/services/workspace-foundation/session-workspace.ts'
-import { verifyWorkspacePath } from '../../src/main/services/workspace-foundation/workspace-selection.ts'
+import { createWorkspaceBinding, getSelectedWorkspaceBinding } from '../../src/main/services/workspace-foundation/session-workspace.ts'
+import { clearWorkspace, getWorkspaceSelectionStatus, setWorkspacePath, verifyWorkspacePath } from '../../src/main/services/workspace-foundation/workspace-selection.ts'
 
 test('isUncOrDevicePath rejects UNC, extended, and device paths', () => {
   assert.equal(isUncOrDevicePath('\\\\server\\share\\x'), true, 'UNC')
@@ -41,4 +41,16 @@ test('createWorkspaceBinding produces stable identity for the same path', () => 
     assert.ok(a.workspaceDisplayId.includes('#'), 'displayId contains hash marker')
     assert.equal(a.cwd, b.cwd, 'cwd equal')
   } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('a picker-selected workspace is the authoritative status and binding', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aw-wf-picked-'))
+  try {
+    assert.ok(setWorkspacePath(root))
+    assert.equal(getWorkspaceSelectionStatus().displayName, root.split(/[\\/]/).at(-1))
+    assert.equal(getSelectedWorkspaceBinding()?.cwd, createWorkspaceBinding(root).cwd)
+  } finally {
+    clearWorkspace()
+    rmSync(root, { recursive: true, force: true })
+  }
 })

@@ -4,6 +4,7 @@ import { IPC_CHANNELS } from '../../shared/ipc-types.ts'
 import { buildVerificationReceipt } from '../../shared/verification-receipt-builder.ts'
 import type { VerificationReceipt } from '../../shared/verification-receipt-types.ts'
 import { CONTROLLED_VERIFICATION_CRITERION_ID } from '../../shared/controlled-verification-execution-types.ts'
+import { validateVerificationContract } from '../../shared/verification-validation.ts'
 import { ControlledVerificationManager } from '../services/controlled-verification-manager.ts'
 import { rememberContract } from '../services/observation/contract-store'
 import { VerificationExportService } from '../services/verification-export-service.ts'
@@ -96,8 +97,12 @@ export function registerControlledVerificationHandlers(): void {
   const exportService = new VerificationExportService({ isPackaged: () => app.isPackaged })
 
   ipcMain.handle(IPC_CHANNELS.CONTROLLED_VERIFICATION_PREVIEW, async (_event, raw: unknown) => {
-    rememberContract((raw as { contract?: unknown } | null)?.contract)
-    return manager.createPreview(raw)
+    const preview = await manager.createPreview(raw)
+    // Only a successfully generated preview becomes the remembered contract.
+    // The contract-store notification immediately revokes any older lease.
+    const contract = validateVerificationContract((raw as { contract?: unknown } | null)?.contract)
+    rememberContract(contract)
+    return preview
   })
 
   ipcMain.handle(IPC_CHANNELS.CONTROLLED_VERIFICATION_CONFIRM, async (_event, raw: unknown) => {

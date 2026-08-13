@@ -68,12 +68,14 @@ export interface ObservedSession {
 export interface ObservationStatus {
   enabled: boolean
   hooksInstalled: boolean
+  hookHealth: HookHealth
   /** basename only of the settings file, or null. */
   hookConfigPath: string | null
   activeSessions: ObservedSession[]
   lastError: string | null
   /** Live auto-verification settings (source of truth for the UI). */
   autoVerify: AutoVerifySettings
+  auditHealth: AuditHealth
   /** Directories that would be watched, display-safe (`~`-relative). */
   watchedDirs: { claudeProjects: string; codexSessions: string }
 }
@@ -84,13 +86,56 @@ export interface AutoVerifySettings {
   workspaceOnly: boolean
   /** Subset of REGISTERED_RECIPES ids allowed to auto-run. */
   recipeIds: string[]
+  authorization?: AutoVerificationAuthorization | null
+}
+
+export type AutoVerificationAuthorizationState = 'AUTHORIZED' | 'REVOKED' | 'CONSUMED' | 'EXPIRED'
+
+export type AutoVerificationRevocationReason =
+  | 'USER_DISABLED'
+  | 'WORKSPACE_CHANGED'
+  | 'WORKSPACE_CLEARED'
+  | 'CONTRACT_CHANGED'
+  | 'RECIPE_CHANGED'
+  | 'OBSERVATION_DISABLED'
+  | 'APP_EXITED'
+  | 'AUDIT_UNAVAILABLE'
+
+/** Display-safe projection. Full cwd and full contract digest remain Main-only. */
+export interface AutoVerificationAuthorization {
+  authorizationId: string
+  workspaceDisplayId: string
+  contractDigestPrefix: string
+  recipeIds: string[]
+  recipeLabels: string[]
+  trigger: 'session:end'
+  createdAt: number
+  state: AutoVerificationAuthorizationState
+  reason: AutoVerificationRevocationReason | null
+}
+
+export type AuditHealth =
+  | { state: 'HEALTHY'; error: null }
+  | { state: 'DEGRADED'; error: string }
+
+export type HookHealthState =
+  | 'NOT_INSTALLED'
+  | 'INSTALLED_HEALTHY'
+  | 'INSTALLED_DRIFTED'
+  | 'SERVER_UNAVAILABLE'
+  | 'WATCHER_ERROR'
+
+export interface HookHealth {
+  state: HookHealthState
+  reason: string | null
+  action: 'INSTALL' | 'REPAIR' | 'RESTART_OBSERVATION' | 'NONE'
 }
 
 export interface HookPreviewResult {
   ok: boolean
   backupPath: string | null
   reason?: string
-  /** Full JSON that would be written to settings.json (for the confirm dialog). */
+  /** Token-redacted display JSON for the confirm dialog. */
   previewJson?: string
   /** basename of the settings file that would be modified. */
   targetPath?: string
