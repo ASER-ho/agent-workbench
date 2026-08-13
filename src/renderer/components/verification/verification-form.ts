@@ -34,6 +34,17 @@ const DRIVE_RE = /^[A-Za-z]:/
 const UNC_OR_DEVICE_RE = /^(?:\\\\|\/\/|\\[?.]\\)/
 const ALLOWED_TEST_EXTENSIONS = new Set(['.js', '.mjs', '.cjs'])
 
+/**
+ * Submit-boundary normalization for path list editors. During editing the raw
+ * text is kept untouched (newlines, internal/trailing spaces, empty lines) so
+ * keyboard Enter/Space is never swallowed. Only at the confirm/preview boundary
+ * is a raw line array trimmed per line, emptied of blank lines, and returned as
+ * the committed allowed/forbidden path list. Validation stays unchanged.
+ */
+export function normalizePathList(rawLines: readonly string[]): string[] {
+  return rawLines.map(line => line.trim()).filter(Boolean)
+}
+
 /** Mirrors normalizeVerificationPath. Returns a Chinese display message or undefined when valid. */
 export function validateVerificationPathLine(value: string): string | undefined {
   const input = value.trim()

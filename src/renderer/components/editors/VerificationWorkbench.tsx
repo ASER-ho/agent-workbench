@@ -21,7 +21,7 @@ import type {
 } from '../../../shared/controlled-verification-execution-types'
 import { createInspectionGuard, sameWorkspace } from './inspection-guard'
 import { useTr } from '../verification/verification-i18n'
-import { computeCompleteness, validateContract } from '../verification/verification-form'
+import { computeCompleteness, normalizePathList, validateContract } from '../verification/verification-form'
 import ContractFormSection from '../verification/ContractFormSection'
 import ReviewSection from '../verification/ReviewSection'
 import VerifyRunningSection from '../verification/VerifyRunningSection'
@@ -198,8 +198,11 @@ export default function VerificationWorkbench() {
   }, [committedContract, committedTestPath, invalidateDerived])
 
   // ── REVIEW loading ────────────────────────────────────────────────
-  const loadReview = useCallback(async () => {
+  const loadReview = useCallback(async (contractOverride?: VerificationContract) => {
     const requestId = guardRef.current.begin()
+    // The continue boundary passes the normalized contract so the execution
+    // preview never receives raw (untrimmed / blank) path lines.
+    const c = contractOverride ?? contract
     setPreviewBusy(true)
     setPreviewError('')
     setInspectionError('')
@@ -227,7 +230,7 @@ export default function VerificationWorkbench() {
     // Subject / observation (scope inspection) — best effort, independent of preview.
     void (async () => {
       try {
-        const next = await window.api.verification.inspect(contract)
+        const next = await window.api.verification.inspect(c)
         if (guardRef.current.shouldAccept(requestId)) setInspection(next)
       } catch {
         if (guardRef.current.shouldAccept(requestId)) {
@@ -238,7 +241,7 @@ export default function VerificationWorkbench() {
 
     // Execution preview — real controlledVerification.preview IPC.
     try {
-      const next = await window.api.controlledVerification.preview({ testPath: testPath.trim(), contract })
+      const next = await window.api.controlledVerification.preview({ testPath: testPath.trim(), contract: c })
       if (!guardRef.current.shouldAccept(requestId)) return
       setPreview(next)
       setCvResult(null)
@@ -253,18 +256,27 @@ export default function VerificationWorkbench() {
   }, [contract, testPath, tr, applyWorkspace])
 
   const handleContinueToReview = useCallback(async () => {
-    const errors = validateContract(contract, testPath)
+    // Submit-boundary normalization: the editor kept raw path lines (newlines,
+    // trailing spaces, blank lines); here we trim each line, drop blank lines,
+    // then validate and commit the normalized contract to the preview.
+    const normalizedContract: VerificationContract = {
+      ...contract,
+      allowedPaths: normalizePathList(contract.allowedPaths),
+      forbiddenPaths: normalizePathList(contract.forbiddenPaths)
+    }
+    const errors = validateContract(normalizedContract, testPath)
     const hasErrors = Object.keys(errors).length > 0
     setShowErrors(true)
     if (hasErrors) return
-    setCommittedContract({ ...contract })
+    setCommittedContract({ ...normalizedContract })
     setCommittedTestPath(testPath)
-    draftStore.committedContract = { ...contract }
+    draftStore.committedContract = { ...normalizedContract }
     draftStore.committedTestPath = testPath
     draftStore.dirty = false
     setDirty(false)
+    setContract(normalizedContract)
     setStage('review')
-    await loadReview()
+    await loadReview(normalizedContract)
   }, [contract, testPath, loadReview])
 
   const handleBackToDefine = useCallback(() => {

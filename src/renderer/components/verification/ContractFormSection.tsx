@@ -35,10 +35,6 @@ export interface ContractFormSectionProps {
   onDiscardConfirm: () => void
 }
 
-function lines(value: string): string[] {
-  return value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)
-}
-
 function lineValue(value: string[]): string {
   return value.join('\n')
 }
@@ -260,7 +256,10 @@ export default function ContractFormSection({
               rows={4}
               placeholder={'src\ntest'}
               style={showFieldError('allowedPaths', contract.allowedPaths.some(p => p.trim())) ? inputErrorStyle : inputStyle}
-              onChange={event => setContractField('allowedPaths', lines(event.target.value))}
+              // Editing preserves raw text (newlines, internal/trailing spaces, empty
+              // lines) so Enter and Space are never swallowed. Normalization (trim /
+              // remove empty / validate) happens once at the continue boundary.
+              onChange={event => setContractField('allowedPaths', event.target.value.split(/\r?\n/))}
             />
             {showFieldError('allowedPaths', contract.allowedPaths.some(p => p.trim())) && (
               <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--failed)' }}>{fieldErrors.allowedPaths}</p>
@@ -274,7 +273,7 @@ export default function ContractFormSection({
               rows={4}
               placeholder={'.git'}
               style={showFieldError('forbiddenPaths', contract.forbiddenPaths.some(p => p.trim())) ? inputErrorStyle : inputStyle}
-              onChange={event => setContractField('forbiddenPaths', lines(event.target.value))}
+              onChange={event => setContractField('forbiddenPaths', event.target.value.split(/\r?\n/))}
             />
             {showFieldError('forbiddenPaths', contract.forbiddenPaths.some(p => p.trim())) && (
               <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--failed)' }}>{fieldErrors.forbiddenPaths}</p>
