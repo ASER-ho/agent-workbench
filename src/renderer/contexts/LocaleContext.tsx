@@ -1432,6 +1432,85 @@ const LOCALE_DATA: Record<Locale, Record<string, string>> = {
   }
 }
 
+const OBSERVATION_013_LOCALE: Record<Locale, Record<string, string>> = {
+  zh: {
+    'observation.actionFailed': '操作失败',
+    'observation.repairHooks': '预览 Hook 更新',
+    'observation.restart': '重新启用观察',
+    'observation.hooksRemoved': 'Hook 已卸载',
+    'observation.healthTitle': '观察与 Hook 健康',
+    'observation.nextAction': '下一步',
+    'observation.none': '无需操作',
+    'observation.lastError': '错误',
+    'observation.workspace': '工作区',
+    'observation.contract': '合同摘要',
+    'observation.trigger': '触发条件',
+    'observation.triggerSessionEnd': '会话结束',
+    'observation.singleUse': '本授权仅执行一次；运行后自动关闭。',
+    'observation.authorizationActive': '已授权（单次）',
+    'observation.authorizationOff': '关闭',
+    'observation.revoke': '撤销授权',
+    'observation.armOnce': '授权一次',
+    'observation.authorizationRevoked': '自动验证已撤销',
+    'observation.authorizationConsumed': '授权已消费；自动验证已关闭。',
+    'observation.auditDegraded': '审计健康已降级',
+    'observation.hookHealth.NOT_INSTALLED': 'Hook 未安装',
+    'observation.hookHealth.INSTALLED_HEALTHY': 'Hook 已安装且健康',
+    'observation.hookHealth.INSTALLED_DRIFTED': '检测到 Hook 配置漂移',
+    'observation.hookHealth.SERVER_UNAVAILABLE': '观察服务器不可用',
+    'observation.hookHealth.WATCHER_ERROR': 'Transcript watcher 异常',
+    'observation.healthReason.INSTALLED_DRIFTED': '当前 Claude Hook endpoint 与活动观察服务器不一致。',
+    'observation.healthReason.SERVER_UNAVAILABLE': '活动观察服务器当前不可用。',
+    'observation.healthReason.WATCHER_ERROR': 'Transcript watcher 未能启动。',
+    'observation.revocation.USER_DISABLED': '用户已关闭',
+    'observation.revocation.WORKSPACE_CHANGED': '工作区已改变',
+    'observation.revocation.WORKSPACE_CLEARED': '工作区已清除',
+    'observation.revocation.CONTRACT_CHANGED': '合同已改变',
+    'observation.revocation.RECIPE_CHANGED': '配方已改变',
+    'observation.revocation.OBSERVATION_DISABLED': '观察已关闭',
+    'observation.revocation.APP_EXITED': '应用已退出',
+    'observation.revocation.AUDIT_UNAVAILABLE': '审计不可用'
+  },
+  en: {
+    'observation.actionFailed': 'Action failed',
+    'observation.repairHooks': 'Preview Hook update',
+    'observation.restart': 'Re-enable observation',
+    'observation.hooksRemoved': 'Hooks removed',
+    'observation.healthTitle': 'Observation and Hook health',
+    'observation.nextAction': 'Next action',
+    'observation.none': 'None',
+    'observation.lastError': 'Error',
+    'observation.workspace': 'Workspace',
+    'observation.contract': 'Contract digest',
+    'observation.trigger': 'Trigger',
+    'observation.triggerSessionEnd': 'Session end',
+    'observation.singleUse': 'This authorization runs once and turns off after execution.',
+    'observation.authorizationActive': 'Authorized (single use)',
+    'observation.authorizationOff': 'Off',
+    'observation.revoke': 'Revoke authorization',
+    'observation.armOnce': 'Authorize once',
+    'observation.authorizationRevoked': 'Auto-verification revoked',
+    'observation.authorizationConsumed': 'Authorization consumed; auto-verification is off.',
+    'observation.auditDegraded': 'Audit health degraded',
+    'observation.hookHealth.NOT_INSTALLED': 'Hooks not installed',
+    'observation.hookHealth.INSTALLED_HEALTHY': 'Hooks installed and healthy',
+    'observation.hookHealth.INSTALLED_DRIFTED': 'Hook configuration drift detected',
+    'observation.hookHealth.SERVER_UNAVAILABLE': 'Observation server unavailable',
+    'observation.hookHealth.WATCHER_ERROR': 'Transcript watcher error',
+    'observation.healthReason.INSTALLED_DRIFTED': 'The installed Claude Hook endpoint does not match the active Observation server.',
+    'observation.healthReason.SERVER_UNAVAILABLE': 'The active Observation server is unavailable.',
+    'observation.healthReason.WATCHER_ERROR': 'The transcript watcher could not start.',
+    'observation.revocation.USER_DISABLED': 'disabled by user',
+    'observation.revocation.WORKSPACE_CHANGED': 'workspace changed',
+    'observation.revocation.WORKSPACE_CLEARED': 'workspace cleared',
+    'observation.revocation.CONTRACT_CHANGED': 'contract changed',
+    'observation.revocation.RECIPE_CHANGED': 'recipe changed',
+    'observation.revocation.OBSERVATION_DISABLED': 'observation disabled',
+    'observation.revocation.APP_EXITED': 'application exited',
+    'observation.revocation.AUDIT_UNAVAILABLE': 'audit unavailable'
+  }
+}
+
 interface LocaleContextType {
   locale: Locale
   t: (key: string) => string
@@ -1444,7 +1523,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('zh')
 
   const t = useCallback((key: string): string => {
-    return LOCALE_DATA[locale][key] ?? LOCALE_DATA['zh'][key] ?? key
+    return OBSERVATION_013_LOCALE[locale][key] ?? LOCALE_DATA[locale][key] ?? LOCALE_DATA['zh'][key] ?? key
   }, [locale])
 
   const setLocale = useCallback((l: Locale) => {

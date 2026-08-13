@@ -38,7 +38,35 @@ export interface HookPreview {
   targetPath: string
   backupPath: string
   mergedJson: string
+  displayJson: string
   reason?: string
+}
+
+export interface HookEndpointInspection {
+  installed: boolean
+  matchesActiveEndpoint: boolean
+  reason: 'NOT_INSTALLED' | 'CONFIG_UNREADABLE' | 'ENDPOINT_MISMATCH' | 'INCOMPLETE_INSTALLATION' | null
+}
+
+export interface InstalledHookEndpoint {
+  port: number
+  token: string
+}
+
+/** Main-only recovery of a previously installed loopback endpoint. */
+export function readInstalledHookEndpoint(settingsPath: string): InstalledHookEndpoint | null {
+  if (!existsSync(settingsPath)) return null
+  try {
+    const parsed = JSON.parse(readFileSync(settingsPath, 'utf8')) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const match = JSON.stringify(parsed).match(/http:\/\/127\.0\.0\.1:(\d+)\/state\?token=([a-f0-9]{32})&src=agent-workbench/i)
+    if (!match) return null
+    const port = Number(match[1])
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return null
+    return { port, token: match[2] }
+  } catch {
+    return null
+  }
 }
 
 export class HookInstaller {
@@ -49,17 +77,40 @@ export class HookInstaller {
   }
 
   isInstalled(): boolean {
+    return this.inspectEndpoint().installed
+  }
+
+  inspectEndpoint(): HookEndpointInspection {
     const settings = this.read()
-    return settings !== null && JSON.stringify(settings).includes(MARKER)
+    if (settings === null) return { installed: false, matchesActiveEndpoint: false, reason: 'CONFIG_UNREADABLE' }
+    const serialized = JSON.stringify(settings)
+    if (!serialized.includes(MARKER)) return { installed: false, matchesActiveEndpoint: false, reason: 'NOT_INSTALLED' }
+    const hooks = settings['hooks'] && typeof settings['hooks'] === 'object' && !Array.isArray(settings['hooks'])
+      ? settings['hooks'] as Record<string, unknown>
+      : {}
+    const expected = this.hookUrl()
+    const expectedEvents = [...SIMPLE_EVENTS, ...TOOL_EVENTS]
+    for (const event of expectedEvents) {
+      const groups = Array.isArray(hooks[event]) ? hooks[event] as HookGroup[] : []
+      const entries = groups.flatMap((group) => Array.isArray(group.hooks) ? group.hooks : [])
+      const awEntries = entries.filter((entry) => JSON.stringify(entry).includes(MARKER))
+      if (awEntries.length === 0) return { installed: true, matchesActiveEndpoint: false, reason: 'INCOMPLETE_INSTALLATION' }
+      if (awEntries.some((entry) => entry['type'] !== 'http' || entry['url'] !== expected)) {
+        return { installed: true, matchesActiveEndpoint: false, reason: 'ENDPOINT_MISMATCH' }
+      }
+    }
+    return { installed: true, matchesActiveEndpoint: true, reason: null }
   }
 
   preview(): HookPreview {
     const base = this.read()
     if (base === null) {
-      return { ok: false, targetPath: basename(this.opts.settingsPath), backupPath: basename(this.opts.backupPath), mergedJson: '', reason: 'settings.json is malformed; not overwriting' }
+      return { ok: false, targetPath: basename(this.opts.settingsPath), backupPath: basename(this.opts.backupPath), mergedJson: '', displayJson: '', reason: 'settings.json is malformed; not overwriting' }
     }
     const merged = this.merge(base)
-    return { ok: true, targetPath: basename(this.opts.settingsPath), backupPath: basename(this.opts.backupPath), mergedJson: JSON.stringify(merged, null, 2) }
+    const mergedJson = JSON.stringify(merged, null, 2)
+    const displayJson = mergedJson.replace(/([?&]token=)[^&"\\]+/gi, '$1[REDACTED]')
+    return { ok: true, targetPath: basename(this.opts.settingsPath), backupPath: basename(this.opts.backupPath), mergedJson, displayJson }
   }
 
   install(): { ok: boolean; backupPath: string | null; reason?: string } {
@@ -132,8 +183,11 @@ export class HookInstaller {
   }
 
   private merge(base: SettingsFile): SettingsFile {
-    const hooks = (base['hooks'] && typeof base['hooks'] === 'object' && !Array.isArray(base['hooks']))
-      ? { ...(base['hooks'] as Record<string, unknown>) }
+    // Strip only our previous entries first. This makes both reinstall and
+    // confirmed repair update stale endpoints without touching user hooks.
+    const cleaned = this.stripMarker(base)
+    const hooks = (cleaned['hooks'] && typeof cleaned['hooks'] === 'object' && !Array.isArray(cleaned['hooks']))
+      ? { ...(cleaned['hooks'] as Record<string, unknown>) }
       : {}
     for (const event of SIMPLE_EVENTS) {
       const groups = Array.isArray(hooks[event]) ? (hooks[event] as HookGroup[]) : []
@@ -149,7 +203,7 @@ export class HookInstaller {
       }
       hooks[event] = groups
     }
-    return { ...base, hooks }
+    return { ...cleaned, hooks }
   }
 
   private stripMarker(base: SettingsFile): SettingsFile {
@@ -158,7 +212,13 @@ export class HookInstaller {
       : {}
     for (const key of Object.keys(hooks)) {
       const groups = Array.isArray(hooks[key]) ? (hooks[key] as HookGroup[]) : []
-      const kept = groups.filter((g) => !JSON.stringify(g.hooks ?? []).includes(MARKER))
+      const kept = groups
+        .map((group) => ({
+          ...group,
+          hooks: (Array.isArray(group.hooks) ? group.hooks : [])
+            .filter((entry) => !JSON.stringify(entry).includes(MARKER))
+        }))
+        .filter((group) => group.hooks.length > 0)
       if (kept.length === 0) delete hooks[key]
       else hooks[key] = kept
     }

@@ -1,16 +1,17 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http'
 import { randomBytes } from 'crypto'
 import { normalizeHookEvent } from './agent-events.ts'
-import type { ObservedAgentEvent } from '../../../shared/observation-types.ts'
+import type { ObservedAgentEventInternal } from './agent-events.ts'
 
 /** Loopback-only. Preferred fixed port so installed hook URLs survive restarts. */
 const PREFERRED_PORT = 28331
 const MAX_BODY_BYTES = 4096
 
 export interface ObservationEventServer {
-  start(): Promise<{ port: number; token: string }>
+  start(preferred?: { port: number; token: string }): Promise<{ port: number; token: string }>
   stop(): Promise<void>
-  onEvent(handler: (event: ObservedAgentEvent) => void): () => void
+  isRunning(): boolean
+  onEvent(handler: (event: ObservedAgentEventInternal) => void): () => void
 }
 
 /**
@@ -21,16 +22,17 @@ export interface ObservationEventServer {
  */
 export class HttpObservationEventServer implements ObservationEventServer {
   private server: Server | null = null
-  private readonly token = randomBytes(16).toString('hex')
-  private handlers = new Set<(e: ObservedAgentEvent) => void>()
+  private token = randomBytes(16).toString('hex')
+  private handlers = new Set<(e: ObservedAgentEventInternal) => void>()
 
-  onEvent(handler: (e: ObservedAgentEvent) => void): () => void {
+  onEvent(handler: (e: ObservedAgentEventInternal) => void): () => void {
     this.handlers.add(handler)
     return () => { this.handlers.delete(handler) }
   }
 
-  async start(): Promise<{ port: number; token: string }> {
+  async start(preferred?: { port: number; token: string }): Promise<{ port: number; token: string }> {
     if (this.server) return this.info()
+    this.token = preferred?.token ?? randomBytes(16).toString('hex')
     const server = createServer((req, res) => { void this.route(req, res) })
     const listen = (port: number): Promise<void> => new Promise((resolve, reject) => {
       const onError = (err: Error): void => { server.removeListener('listening', onListening); reject(err) }
@@ -40,7 +42,7 @@ export class HttpObservationEventServer implements ObservationEventServer {
       server.listen(port, '127.0.0.1')
     })
     try {
-      await listen(PREFERRED_PORT)
+      await listen(preferred?.port ?? PREFERRED_PORT)
     } catch {
       await listen(0)
     }
@@ -52,6 +54,10 @@ export class HttpObservationEventServer implements ObservationEventServer {
     if (!this.server) return
     await new Promise<void>((resolve) => { this.server!.close(() => resolve()) })
     this.server = null
+  }
+
+  isRunning(): boolean {
+    return this.server !== null
   }
 
   private info(): { port: number; token: string } {
@@ -113,16 +119,16 @@ export class HttpObservationEventServer implements ObservationEventServer {
     return new Promise((resolve) => {
       const chunks: Buffer[] = []
       let size = 0
+      let tooLarge = false
       req.on('data', (chunk: Buffer) => {
         size += chunk.length
         if (size > MAX_BODY_BYTES) {
-          resolve(null)
-          req.destroy()
+          tooLarge = true
           return
         }
-        chunks.push(chunk)
+        if (!tooLarge) chunks.push(chunk)
       })
-      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+      req.on('end', () => resolve(tooLarge ? null : Buffer.concat(chunks).toString('utf8')))
       req.on('error', () => resolve(null))
     })
   }

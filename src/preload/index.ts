@@ -1,7 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-types'
 import type { DiagnosticReport, RuntimeProviderStatus, SetRuntimeProviderRequest, PackageProgress } from '../shared/ipc-types'
-import type { AutoVerifySettings, HookPreviewResult, ObservedAgentEvent, ObservedSession, ObservationStatus } from '../shared/observation-types'
+import type {
+  AutoVerifySettings, HookPreviewResult, ObservedAgentEvent, ObservedSession,
+  ObservationStatus, VerificationCompletedPayload
+} from '../shared/observation-types'
 import type { ProjectCapsule } from '../shared/capsule-types'
 import type { SessionLaunchPlan, SessionReadiness, SessionSnapshot } from '../shared/session-types'
 import type {
@@ -142,8 +145,9 @@ export interface AgentWorkbenchApi {
     setAutoVerify: (settings: AutoVerifySettings) => Promise<ObservationStatus>
     getLastReceipt: () => Promise<unknown>
     onEvent: (callback: (event: ObservedAgentEvent) => void) => () => void
+    onStatusUpdated: (callback: (status: ObservationStatus) => void) => () => void
     onSessionUpdated: (callback: (sessions: ObservedSession[]) => void) => () => void
-    onVerificationCompleted: (callback: (receipt: unknown) => void) => () => void
+    onVerificationCompleted: (callback: (receipt: VerificationCompletedPayload) => void) => () => void
   }
   session: {
     readiness: (workspaceLabel: string, confirmationId?: string) => Promise<SessionReadiness>
@@ -277,17 +281,22 @@ const api: AgentWorkbenchApi = {
     setAutoVerify: (settings) => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_SET_AUTO_VERIFY, settings),
     getLastReceipt: () => ipcRenderer.invoke(IPC_CHANNELS.OBSERVATION_GET_LAST_RECEIPT),
     onEvent: (callback) => {
-      const handler = (_e, e) => callback(e)
+      const handler = (_e: Electron.IpcRendererEvent, event: ObservedAgentEvent) => callback(event)
       ipcRenderer.on(IPC_CHANNELS.OBSERVATION_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_EVENT, handler)
     },
+    onStatusUpdated: (callback) => {
+      const handler = (_e: Electron.IpcRendererEvent, status: ObservationStatus) => callback(status)
+      ipcRenderer.on(IPC_CHANNELS.OBSERVATION_STATUS_UPDATED, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_STATUS_UPDATED, handler)
+    },
     onSessionUpdated: (callback) => {
-      const handler = (_e, sessions) => callback(sessions)
+      const handler = (_e: Electron.IpcRendererEvent, sessions: ObservedSession[]) => callback(sessions)
       ipcRenderer.on(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, handler)
     },
     onVerificationCompleted: (callback) => {
-      const handler = (_e, receipt) => callback(receipt)
+      const handler = (_e: Electron.IpcRendererEvent, receipt: VerificationCompletedPayload) => callback(receipt)
       ipcRenderer.on(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, handler)
     }

@@ -1,140 +1,200 @@
 import { useState } from 'react'
 import { useLocale } from '../../contexts/LocaleContext'
 import { useObservation } from '../../contexts/ObservationContext'
-import type { ObservedSession, HookPreviewResult } from '../../../shared/observation-types'
+import type {
+  AutoVerificationRevocationReason,
+  HookHealthState,
+  HookPreviewResult,
+  ObservedSession
+} from '../../../shared/observation-types'
 
 export default function ObservationPanel() {
   const { t } = useLocale()
   const obs = useObservation()
   const [preview, setPreview] = useState<HookPreviewResult | null>(null)
-  const [hookResult, setHookResult] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const status = obs.status
   const sessions = obs.sessions
-  const autoVerify = status?.autoVerify ?? { autoVerifyEnabled: false, workspaceOnly: true, recipeIds: ['project-default-check'] }
+  const autoVerify = status?.autoVerify ?? { autoVerifyEnabled: false, workspaceOnly: true, recipeIds: [], authorization: null }
+  const authorization = autoVerify.authorization ?? null
 
-  const beginInstall = async () => {
-    const p = await obs.installHooksPreview()
-    setPreview(p)
+  const run = async (action: () => Promise<void>): Promise<void> => {
+    setBusy(true)
+    setActionError(null)
+    try { await action() } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error))
+    } finally { setBusy(false) }
   }
 
-  const confirmInstall = async () => {
-    const r = await obs.confirmInstallHooks()
-    setPreview(null)
-    setHookResult(r.ok ? t('observation.hooksInstalled') : (r.reason ?? t('observation.installPreviewCancel')))
+  const beginHookChange = async (): Promise<void> => {
+    await run(async () => {
+      const next = await obs.installHooksPreview()
+      if (!next.ok) throw new Error(next.reason ?? t('observation.actionFailed'))
+      setPreview(next)
+    })
   }
 
-  const statusLabel = (s: ObservedSession['status']): string => {
-    const key: Record<string, string> = {
+  const confirmHookChange = async (): Promise<void> => {
+    await run(async () => {
+      const result = await obs.confirmInstallHooks()
+      if (!result.ok) throw new Error(result.reason ?? t('observation.actionFailed'))
+      setPreview(null)
+      setNotice(t('observation.hooksInstalled'))
+    })
+  }
+
+  const restartObservation = async (): Promise<void> => {
+    await run(async () => {
+      if (status?.enabled) await obs.disable()
+      await obs.enable()
+    })
+  }
+
+  const hookAction = (): { label: string; action: () => Promise<void> } | null => {
+    switch (status?.hookHealth.state) {
+      case 'NOT_INSTALLED': return { label: t('observation.installHooks'), action: beginHookChange }
+      case 'INSTALLED_DRIFTED': return { label: t('observation.repairHooks'), action: beginHookChange }
+      case 'SERVER_UNAVAILABLE':
+      case 'WATCHER_ERROR': return { label: t('observation.restart'), action: restartObservation }
+      case 'INSTALLED_HEALTHY': return {
+        label: t('observation.uninstallHooks'),
+        action: async () => { await run(async () => { await obs.uninstallHooks(); setNotice(t('observation.hooksRemoved')) }) }
+      }
+      default: return null
+    }
+  }
+
+  const currentHookAction = hookAction()
+
+  const statusLabel = (sessionStatus: ObservedSession['status']): string => {
+    const key: Record<ObservedSession['status'], string> = {
       idle: t('observation.status.idle'), thinking: t('observation.status.thinking'),
       working: t('observation.status.working'), attention: t('observation.status.attention'),
       sleeping: t('observation.status.sleeping'), error: t('observation.status.error'), ended: t('observation.status.ended')
     }
-    return key[s] ?? s
+    return key[sessionStatus]
   }
 
-  const agentLabel = (s: ObservedSession): string => t('observation.agent.' + s.agentKind)
+  const hookLabel = (state: HookHealthState | undefined): string => state
+    ? t(`observation.hookHealth.${state}`)
+    : t('observation.hookHealth.NOT_INSTALLED')
+
+  const revocationLabel = (reason: AutoVerificationRevocationReason | null): string => reason
+    ? t(`observation.revocation.${reason}`)
+    : ''
 
   return (
-    <div className="rounded-lg border p-4"
-      style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-      <div className="flex items-center justify-between gap-2">
+    <div className="rounded-lg border p-4" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t('observation.title')}</h3>
-          <p className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{t('observation.desc')}</p>
+          <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{t('observation.desc')}</p>
         </div>
-        <button
-          onClick={() => { void (status?.enabled ? obs.disable() : obs.enable()) }}
-          className="rounded px-3 py-1 text-[11px] transition-colors"
-          style={{ background: status?.enabled ? 'var(--verified-soft)' : 'var(--bg-tertiary)', color: status?.enabled ? 'var(--verified)' : 'var(--text-secondary)', border: '1px solid var(--border-color)' }}
-        >
+        <button disabled={busy} onClick={() => void run(status?.enabled ? obs.disable : obs.enable)}
+          className="shrink-0 rounded px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
+          style={{ background: status?.enabled ? 'var(--verified-soft)' : 'var(--bg-tertiary)', color: status?.enabled ? 'var(--verified)' : 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
           {status?.enabled ? t('observation.disable') : t('observation.enable')}
         </button>
       </div>
 
-      {status?.enabled && (
-        <p className="mt-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+      <section className="mt-4 rounded border p-3" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-primary)' }}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t('observation.healthTitle')}</p>
+            <p className="mt-1 text-xs" style={{ color: status?.hookHealth.state === 'INSTALLED_HEALTHY' ? 'var(--verified)' : 'var(--text-secondary)' }}>
+              {hookLabel(status?.hookHealth.state)}
+            </p>
+          </div>
+          {currentHookAction && <button disabled={busy} onClick={() => void currentHookAction.action()}
+            className="rounded px-2.5 py-1.5 text-xs disabled:opacity-50"
+            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+            {currentHookAction.label}
+          </button>}
+        </div>
+        {status?.enabled && <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {t('observation.watchDirs')}: {status.watchedDirs.claudeProjects}, {status.watchedDirs.codexSessions}
-        </p>
-      )}
+        </p>}
+        {status?.hookHealth.reason && <div className="mt-2 rounded p-2 text-xs" style={{ color: 'var(--warn)', background: 'var(--warn-soft)' }}>
+          <p>{t(`observation.healthReason.${status.hookHealth.state}`)}</p>
+          <p className="mt-1">{t('observation.nextAction')}: {currentHookAction?.label ?? t('observation.none')}</p>
+        </div>}
+      </section>
 
-      {status?.lastError && (
-        <p className="mt-2 text-[10px]" style={{ color: 'var(--failed)' }}>{t('observation.lastError')}: {status.lastError}</p>
-      )}
+      {(status?.lastError || actionError) && <div className="mt-3 rounded p-2 text-xs" style={{ color: 'var(--failed)', background: 'var(--failed-soft)' }}>
+        {t('observation.lastError')}: {actionError ?? status?.lastError}
+      </div>}
+      {notice && <p className="mt-2 text-xs" style={{ color: 'var(--verified)' }}>{notice}</p>}
 
-      <div className="mt-3 flex items-center gap-2">
-        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-          {status?.hooksInstalled ? t('observation.hooksInstalled') : t('observation.hooksNotInstalled')}
-        </span>
-        {!status?.hooksInstalled ? (
-          <button onClick={() => void beginInstall()} className="rounded px-2 py-0.5 text-[10px] transition-colors hover:opacity-90"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
-            {t('observation.installHooks')}
-          </button>
-        ) : (
-          <button onClick={() => void obs.uninstallHooks()} className="rounded px-2 py-0.5 text-[10px] transition-colors hover:opacity-90"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
-            {t('observation.uninstallHooks')}
-          </button>
-        )}
-      </div>
-      {hookResult && <p className="mt-1 text-[10px]" style={{ color: 'var(--verified)' }}>{hookResult}</p>}
-
-      <div className="mt-3">
-        <h4 className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{t('observation.sessions')}</h4>
-        {sessions.length === 0 ? (
-          <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{t('observation.noSessions')}</p>
-        ) : (
-          <ul className="space-y-1">
-            {sessions.map(s => (
-              <li key={s.agentKind + ':' + s.sessionId} className="flex items-center gap-2 text-[11px]">
-                <span className="w-2 h-2 rounded-full" style={{ background: statusColor(s.status) }} />
-                <span style={{ color: 'var(--text-primary)' }}>{agentLabel(s)}</span>
-                <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{s.displayPath}</span>
-                <span className="ml-auto shrink-0" style={{ color: 'var(--text-tertiary)' }}>{statusLabel(s.status)} / {s.eventCount}</span>
-              </li>
-            ))}
+      <section className="mt-4">
+        <h4 className="mb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('observation.sessions')}</h4>
+        {sessions.length === 0 ? <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{t('observation.noSessions')}</p> : (
+          <ul className="space-y-1.5">
+            {sessions.map((session) => <li key={`${session.agentKind}:${session.sessionId}`} className="flex items-center gap-2 text-xs">
+              <span className="h-2 w-2 rounded-full" style={{ background: statusColor(session.status) }} />
+              <span style={{ color: 'var(--text-primary)' }}>{t(`observation.agent.${session.agentKind}`)}</span>
+              <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{session.displayPath}</span>
+              <span className="ml-auto shrink-0" style={{ color: 'var(--text-tertiary)' }}>{statusLabel(session.status)} / {session.eventCount}</span>
+            </li>)}
           </ul>
         )}
-      </div>
+      </section>
 
-      {preview && (
-        <div className="mt-3 rounded border p-3" style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}>
-          <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--warn)' }}>{t('observation.installPreviewTitle')}</p>
-          <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-            {t('observation.installPreviewTarget')}: {preview.targetPath || '-'}{' | '}{t('observation.installPreviewBackup')}: {preview.backupPath || '-'}
-          </p>
-          <pre className="mt-2 max-h-40 overflow-auto rounded p-2 text-[9px] whitespace-pre-wrap"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{preview.previewJson}</pre>
-          <div className="mt-2 flex gap-2">
-            <button onClick={() => void confirmInstall()} className="rounded px-2 py-1 text-[10px]"
-              style={{ background: 'var(--verified)', color: 'white' }}>{t('observation.installPreviewConfirm')}</button>
-            <button onClick={() => setPreview(null)} className="rounded px-2 py-1 text-[10px]"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>{t('observation.installPreviewCancel')}</button>
-          </div>
+      {preview && <section className="mt-4 rounded border p-3" style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}>
+        <p className="text-xs font-semibold" style={{ color: 'var(--warn)' }}>{t('observation.installPreviewTitle')}</p>
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          {t('observation.installPreviewTarget')}: {preview.targetPath || '-'} · {t('observation.installPreviewBackup')}: {preview.backupPath || '-'}
+        </p>
+        <pre className="mt-2 max-h-40 overflow-auto rounded p-2 text-[11px] whitespace-pre-wrap" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{preview.previewJson}</pre>
+        <div className="mt-2 flex gap-2">
+          <button disabled={busy} onClick={() => void confirmHookChange()} className="rounded px-2.5 py-1.5 text-xs disabled:opacity-50" style={{ background: 'var(--verified)', color: 'white' }}>{t('observation.installPreviewConfirm')}</button>
+          <button onClick={() => setPreview(null)} className="rounded px-2.5 py-1.5 text-xs" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>{t('observation.installPreviewCancel')}</button>
         </div>
-      )}
+      </section>}
 
-      <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--border-color)' }}>
-        <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-          <input type="checkbox" checked={autoVerify.autoVerifyEnabled}
-            onChange={(e) => void obs.setAutoVerify({ autoVerifyEnabled: e.target.checked, workspaceOnly: true, recipeIds: ['project-default-check'] })} />
-          {t('observation.autoVerifyEnabled')}
-        </label>
-        {obs.lastReceipt ? (
-          <p className="mt-1 text-[10px]" style={{ color: 'var(--verified)' }}>
-            {t('observation.lastReceipt')}: {obs.lastReceipt.trigger === 'auto:session-end' ? t('observation.lastReceiptAuto') : t('observation.lastReceiptManual')}
-          </p>
-        ) : (
-          <p className="mt-1 text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{t('observation.noContract')}</p>
-        )}
-      </div>
+      <section className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{t('observation.autoVerify')}</h4>
+            <p className="mt-1 text-xs" style={{ color: authorization?.state === 'AUTHORIZED' ? 'var(--verified)' : 'var(--text-tertiary)' }}>
+              {authorization?.state === 'AUTHORIZED' ? t('observation.authorizationActive') : t('observation.authorizationOff')}
+            </p>
+          </div>
+          {authorization?.state === 'AUTHORIZED' ? (
+            <button disabled={busy} onClick={() => void run(() => obs.setAutoVerify({ autoVerifyEnabled: false, workspaceOnly: true, recipeIds: [] }))}
+              className="rounded px-2.5 py-1.5 text-xs disabled:opacity-50" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>{t('observation.revoke')}</button>
+          ) : (
+            <button disabled={busy || !status?.enabled} onClick={() => void run(() => obs.setAutoVerify({ autoVerifyEnabled: true, workspaceOnly: true, recipeIds: ['project-default-check'] }))}
+              className="rounded px-2.5 py-1.5 text-xs disabled:opacity-50" style={{ background: 'var(--verified)', color: 'white' }}>{t('observation.armOnce')}</button>
+          )}
+        </div>
+
+        {authorization && <div className="mt-2 grid gap-1 rounded p-2 text-xs" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>
+          <p>{t('observation.workspace')}: {authorization.workspaceDisplayId}</p>
+          <p>{t('observation.recipe')}: {authorization.recipeLabels.join(', ')}</p>
+          <p>{t('observation.contract')}: {authorization.contractDigestPrefix}</p>
+          <p>{t('observation.trigger')}: {t('observation.triggerSessionEnd')}</p>
+          {authorization.state === 'AUTHORIZED' && <p style={{ color: 'var(--warn)' }}>{t('observation.singleUse')}</p>}
+          {authorization.state === 'REVOKED' && <p style={{ color: 'var(--warn)' }}>{t('observation.authorizationRevoked')}: {revocationLabel(authorization.reason)}</p>}
+          {authorization.state === 'CONSUMED' && <p style={{ color: 'var(--verified)' }}>{t('observation.authorizationConsumed')}</p>}
+        </div>}
+
+        {!authorization && <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>{t('observation.noContract')}</p>}
+        {status?.auditHealth.state === 'DEGRADED' && <div className="mt-2 rounded p-2 text-xs" style={{ background: 'var(--failed-soft)', color: 'var(--failed)' }}>
+          {t('observation.auditDegraded')}: {status.auditHealth.error}
+        </div>}
+        {obs.lastReceipt && <p className="mt-2 text-xs" style={{ color: 'var(--verified)' }}>
+          {t('observation.lastReceipt')}: {obs.lastReceipt.trigger === 'auto:session-end' ? t('observation.lastReceiptAuto') : t('observation.lastReceiptManual')}
+        </p>}
+      </section>
     </div>
   )
 }
 
-function statusColor(s: ObservedSession['status']): string {
-  switch (s) {
+function statusColor(status: ObservedSession['status']): string {
+  switch (status) {
     case 'working': return 'var(--verified)'
     case 'thinking': return 'var(--warn)'
     case 'error': return 'var(--failed)'

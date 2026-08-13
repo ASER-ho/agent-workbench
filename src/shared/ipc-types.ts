@@ -290,6 +290,7 @@ export const IPC_CHANNELS = {
   OBSERVATION_SET_AUTO_VERIFY: 'observation:set-auto-verify',
   OBSERVATION_GET_LAST_RECEIPT: 'observation:get-last-receipt',
   OBSERVATION_EVENT: 'observation:event',
+  OBSERVATION_STATUS_UPDATED: 'observation:status-updated',
   OBSERVATION_SESSION_UPDATED: 'observation:session-updated',
   OBSERVATION_VERIFICATION_COMPLETED: 'observation:verification-completed'
 } as const

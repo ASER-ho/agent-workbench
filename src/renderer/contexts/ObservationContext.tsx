@@ -30,9 +30,10 @@ export function ObservationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh()
     const offSessions = window.api.observation.onSessionUpdated((next) => setSessions(next))
+    const offStatus = window.api.observation.onStatusUpdated((next) => { setStatus(next); setSessions(next.activeSessions) })
     const offReceipt = window.api.observation.onVerificationCompleted((r) => setLastReceipt(r))
     const offEvent = window.api.observation.onEvent((_e: ObservedAgentEvent) => { /* keep subscription warm */ })
-    return () => { offSessions(); offReceipt(); offEvent() }
+    return () => { offSessions(); offStatus(); offReceipt(); offEvent() }
   }, [refresh])
 
   const value: ObservationContextValue = {

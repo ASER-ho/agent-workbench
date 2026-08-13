@@ -1,7 +1,8 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { openSync, readSync, closeSync, statSync, mkdirSync } from 'fs'
 import { normalizeTranscriptLine } from './agent-events.ts'
-import type { AgentKind, ObservedAgentEvent } from '../../../shared/observation-types.ts'
+import type { AgentKind } from '../../../shared/observation-types.ts'
+import type { ObservedAgentEventInternal } from './agent-events.ts'
 
 /** How many trailing bytes of a pre-existing transcript to read on first sight. */
 const TAIL_BYTES = 256 * 1024
@@ -25,10 +26,10 @@ interface TrackedFile {
 export class TranscriptWatcher {
   private watcher: FSWatcher | null = null
   private files = new Map<string, TrackedFile>()
-  private handler: ((e: ObservedAgentEvent) => void) | null = null
+  private handler: ((e: ObservedAgentEventInternal) => void) | null = null
   private started = false
 
-  onEvent(handler: (e: ObservedAgentEvent) => void): void {
+  onEvent(handler: (e: ObservedAgentEventInternal) => void): void {
     this.handler = handler
   }
 
