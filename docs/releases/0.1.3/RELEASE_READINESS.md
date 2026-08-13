@@ -21,7 +21,8 @@ AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 | Current rewritten baseline | `22f0f666a9591f9d1a49959232fbf45d1d055491` |
 | Baseline relationship | different commit histories, identical tree `c52fbd6fd274182f1c5d942ce71121ef10e8ca0d` |
 | Branch | `feat/0.1.3-trusted-observation` |
-| Artifact source commit | `6b2564c` (Human RC smoke fix) |
+| Artifact source commit | `6b2564c` (Human RC smoke fix) — full SHA `6b2564caec6bbd7ba39a6a182c0ba734aa3e98a5` |
+| Final evidence HEAD | `b41619f` (docs only; no product/build/smoke change after the artifact source commit) |
 | Previous artifact (superseded) | `E211D522B9C373F5DE140D7C96B3CA5707074125492D4FB9F14E94FEC4851B96` |
 
 The release-evidence commit containing this file is intentionally newer than the artifact source commit. No product, build configuration, or smoke-test code changed after the artifact source commit.
@@ -52,7 +53,7 @@ The release-evidence commit containing this file is intentionally newer than the
 | Gate | Result |
 | --- | --- |
 | `npm run build` | PASS; main 61 modules, preload 2 modules, renderer 77 modules |
-| `npm test -- --exclude test:electron` | PASS; all 22 suites; Observation 49/49 |
+| `npm test -- --exclude test:electron` | PASS; all 23 suites; Observation + tool-resolution included |
 | `npm run test:electron` | PASS; 64/64 in ~3.4 minutes (incl. Tool Resolution panel E2E) |
 | `npm run pack -- --config.electronDist=node_modules/electron/dist` | PASS; Windows x64 unpacked application |
 | `npm run dist -- --config.electronDist=node_modules/electron/dist` | PASS; NSIS installer and blockmap |
