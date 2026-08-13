@@ -54,6 +54,10 @@ Local verification (runs every `test:*` suite in sequence):
 npm test
 ```
 
+Electron E2E (`npm run test:electron`) is a **local release gate** (59 passing on a
+workstation). It is not run in CI because a real Electron window cannot open on the
+headless GitHub Windows runner; CI runs the unit/static/privacy suites only.
+
 Packaging:
 
 ```powershell
