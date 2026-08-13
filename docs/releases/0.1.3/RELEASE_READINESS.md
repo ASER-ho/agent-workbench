@@ -58,6 +58,8 @@ The release-evidence commit containing this file is intentionally newer than the
 
 The non-Electron runner emitted Node's `DEP0190` warning because the existing suite dispatcher uses `shell: true`. The test command exited 0; this warning is tracked as engineering debt and is not treated as functional or release-gate evidence.
 
+Standalone `tsc` is **not claimed as PASS**. The repository's existing TypeScript project configuration reports rootDir, deprecated-option, and import/configuration errors outside this 0.1.3 change. The product compilation gate used here is the successful `electron-vite build`, supplemented by the unit/static/privacy and Electron runtime gates above.
+
 ## Packaged smoke
 
 The smoke ran against `dist/win-unpacked/Agent Workbench.exe`, not the development server.
@@ -103,6 +105,7 @@ Output directory: local ignored `dist/`.
 - **MAJOR:** none found in the executed local gates.
 - **MINOR:** the Windows artifacts are unsigned; SmartScreen/unknown-publisher warnings are expected.
 - **MINOR:** the non-Electron suite dispatcher triggers Node `DEP0190` due to existing `shell: true` child-process invocation.
+- **MINOR:** standalone `tsc` is not a clean current repository gate because of existing project-configuration errors; no standalone typecheck PASS is asserted.
 - Windows x64 is the only release-qualified target.
 - Verification is `PROCESS_BOUNDARY_ONLY`: no filesystem sandbox, container/VM boundary, or enforced network denial.
 - The local audit is append-only by application behavior, not cryptographically tamper-proof.
