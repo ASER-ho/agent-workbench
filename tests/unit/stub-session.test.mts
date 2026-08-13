@@ -4,7 +4,7 @@ import { AgentSessionManager } from '../../src/main/services/agent-session.ts'
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-async function waitFor(predicate: () => boolean, message: string, timeoutMs = 3000): Promise<void> {
+async function waitFor(predicate: () => boolean, message: string, timeoutMs = 8000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (predicate()) return

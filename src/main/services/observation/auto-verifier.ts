@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs'
 import { ControlledVerificationManager, type CompletedVerificationRecord } from '../controlled-verification-manager.ts'
 import { REGISTERED_RECIPES } from './recipe-registry.ts'
 import { getRememberedContract } from './contract-store.ts'
@@ -28,12 +29,15 @@ export class AutoVerifier {
   private readonly onCompleted: (r: CompletedVerificationRecord) => void
   private readonly workspaceProvider: () => WorkspaceLike | null
   private readonly contractProvider: () => VerificationContract | null
+  private readonly auditPath: string | null
 
   constructor(deps: {
     manager?: ControlledVerificationManager
     onCompleted: (r: CompletedVerificationRecord) => void
     workspaceProvider?: () => WorkspaceLike | null
     contractProvider?: () => VerificationContract | null
+    /** Append-only JSONL audit trail for auto-runs; null disables writing. */
+    auditPath?: string | null
   }) {
     this.manager = deps.manager ?? new ControlledVerificationManager({
       gitExecutable: process.env['AGENT_WORKBENCH_E2E_GIT_EXECUTABLE'] || undefined
@@ -41,6 +45,7 @@ export class AutoVerifier {
     this.onCompleted = deps.onCompleted
     this.workspaceProvider = deps.workspaceProvider ?? getSelectedWorkspaceBinding
     this.contractProvider = deps.contractProvider ?? getRememberedContract
+    this.auditPath = deps.auditPath ?? null
   }
 
   enable(settings: AutoVerifySettings): void {
@@ -87,6 +92,27 @@ export class AutoVerifier {
     if (receipt) {
       this.lastReceipt = receipt
       this.onCompleted(receipt)
+      this.writeAudit(recipe.id, event, receipt)
+    }
+  }
+
+  /** Append one display-safe audit line per auto-run. Never full paths/secrets. */
+  private writeAudit(recipeId: string, event: ObservedAgentEventInternal, record: CompletedVerificationRecord): void {
+    if (!this.auditPath) return
+    try {
+      const execution = record.execution as { state?: string; criterion?: { verdict?: string } } | null
+      const preview = record.preview as { workspaceDisplayId?: string } | null
+      const entry = {
+        ts: Date.now(),
+        trigger: 'auto:session-end',
+        recipeId,
+        sessionId: event.sessionId,
+        workspaceDisplayId: preview?.workspaceDisplayId ?? null,
+        verdict: execution?.state === 'executed' ? (execution.criterion?.verdict ?? null) : (execution?.state ?? null)
+      }
+      appendFileSync(this.auditPath, JSON.stringify(entry) + '\n', 'utf8')
+    } catch {
+      /* audit failure must never break the verification pipeline */
     }
   }
 }

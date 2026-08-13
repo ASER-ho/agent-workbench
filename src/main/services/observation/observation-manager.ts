@@ -39,6 +39,8 @@ export interface ObservationManagerDeps {
   codexSessionsDir?: string
   hookSettingsPath?: string
   hookBackupPath?: string
+  /** Append-only JSONL audit trail for auto-verification runs. */
+  auditPath?: string
 }
 
 export class ObservationManager {
@@ -59,7 +61,8 @@ export class ObservationManager {
   constructor(deps: ObservationManagerDeps) {
     this.deps = deps
     this.autoVerifier = new AutoVerifier({
-      onCompleted: (r) => this.deps.onVerificationCompleted({ trigger: 'auto:session-end', receipt: r })
+      onCompleted: (r) => this.deps.onVerificationCompleted({ trigger: 'auto:session-end', receipt: r }),
+      auditPath: deps.auditPath ?? null
     })
     this.watcher.onEvent((e) => { void this.handleEvent(e) })
     this.server.onEvent((e) => { void this.handleEvent(e) })

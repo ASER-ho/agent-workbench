@@ -7,9 +7,9 @@ import type { ObservedAgentEventInternal } from '../../src/main/services/observa
 
 const CONTRACT: VerificationContract = { title: 't', goal: 'g', allowedPaths: ['src'], forbiddenPaths: [], acceptanceCriteria: ['a'], knownRisks: [] }
 const END_EVENT: ObservedAgentEventInternal = { agentKind: 'claude-code', event: 'session:end', sessionId: 's1', cwd: 'C:\\proj', displayPath: 'proj', transcriptPath: null, timestamp: 1, raw: {} }
-const RECORD = { execution: { state: 'executed' } } as unknown as CompletedVerificationRecord
+const RECORD = { execution: { state: 'executed', criterion: { verdict: 'VERIFIED' } }, preview: { workspaceDisplayId: 'ws-1' } } as unknown as CompletedVerificationRecord
 
-function makeVerifier(opts?: { workspace?: string | null; contract?: VerificationContract | null; record?: CompletedVerificationRecord | null }): { verifier: AutoVerifier; completed: CompletedVerificationRecord[] } {
+function makeVerifier(opts?: { workspace?: string | null; contract?: VerificationContract | null; record?: CompletedVerificationRecord | null; auditPath?: string }): { verifier: AutoVerifier; completed: CompletedVerificationRecord[] } {
   const completed: CompletedVerificationRecord[] = []
   const fakeManager = {
     createPreview: async () => ({ confirmationId: 'c1' }),
@@ -20,7 +20,8 @@ function makeVerifier(opts?: { workspace?: string | null; contract?: Verificatio
     manager: fakeManager,
     onCompleted: (r) => completed.push(r),
     workspaceProvider: () => (opts?.workspace === undefined ? { cwd: 'C:\\proj' } : opts.workspace ? { cwd: opts.workspace } : null),
-    contractProvider: () => (opts?.contract === undefined ? CONTRACT : opts.contract)
+    contractProvider: () => (opts?.contract === undefined ? CONTRACT : opts.contract),
+    auditPath: opts?.auditPath ?? null
   })
   return { verifier, completed }
 }
@@ -78,4 +79,25 @@ test('gate: manager with no completed record produces no receipt', async () => {
   verifier.enable({ autoVerifyEnabled: true, workspaceOnly: true, recipeIds: ['project-default-check'] })
   await verifier.handleEvent(END_EVENT)
   assert.equal(completed.length, 0)
+})
+
+test('audit: an auto-run writes a display-safe audit line', async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const root = mkdtempSync(join(tmpdir(), 'aw-audit-'))
+  const auditPath = join(root, 'audit.jsonl')
+  writeFileSync(auditPath, '', 'utf8')
+  const { verifier, completed } = makeVerifier({ auditPath })
+  verifier.enable({ autoVerifyEnabled: true, workspaceOnly: true, recipeIds: ['project-default-check'] })
+  await verifier.handleEvent(END_EVENT)
+  assert.equal(completed.length, 1)
+  const lines = readFileSync(auditPath, 'utf8').split('\n').filter(Boolean)
+  assert.equal(lines.length, 1)
+  const entry = JSON.parse(lines[0])
+  assert.equal(entry.trigger, 'auto:session-end')
+  assert.equal(entry.recipeId, 'project-default-check')
+  assert.equal(entry.verdict, 'VERIFIED')
+  assert.equal(entry.sessionId, 's1')
+  rmSync(root, { recursive: true, force: true })
 })

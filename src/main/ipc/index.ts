@@ -55,7 +55,8 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
   const observationManager = new ObservationManager({
     onSessionsChanged: (sessions) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_SESSION_UPDATED, sessions),
     onVerificationCompleted: (payload) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_VERIFICATION_COMPLETED, payload),
-    onEvent: (event) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_EVENT, event)
+    onEvent: (event) => mainWindow.webContents.send(IPC_CHANNELS.OBSERVATION_EVENT, event),
+    auditPath: join(app.getPath('userData'), 'observation-audit.jsonl')
   })
   registerObservationHandlers(observationManager)
 }

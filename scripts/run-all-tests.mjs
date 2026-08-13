@@ -1,4 +1,6 @@
 // Sequential runner for every `test:*` npm script — single entry: `npm test`.
+// Supports `--exclude <name>` (repeatable, or comma-separated after `=`) so CI
+// can split the battery (e.g. exclude test:electron in the unit job).
 // Ensures the app is built before suites that consume out/ (privacy scan,
 // Electron E2E). Exits non-zero if any suite fails.
 import { spawnSync } from 'node:child_process'
@@ -12,10 +14,22 @@ const pkg = require('../package.json')
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const outMain = resolve(root, 'out', 'main', 'index.js')
 
-const suites = Object.entries(pkg.scripts).filter(([name]) => name.startsWith('test:'))
+const rawArgs = process.argv.slice(2)
+const excludes = new Set()
+for (let i = 0; i < rawArgs.length; i++) {
+  const a = rawArgs[i]
+  if (a === '--exclude' && rawArgs[i + 1]) { rawArgs[i + 1].split(',').forEach((n) => excludes.add(n)); i++ }
+  else if (a.startsWith('--exclude=')) { a.slice('--exclude='.length).split(',').forEach((n) => excludes.add(n)) }
+}
+
+const suites = Object.entries(pkg.scripts)
+  .filter(([name]) => name.startsWith('test:') && !excludes.has(name))
 if (suites.length === 0) {
   console.error('No test:* scripts found in package.json')
   process.exit(1)
+}
+if (excludes.size > 0) {
+  console.log(`excluding: ${[...excludes].join(', ')} — running ${suites.length} suites`)
 }
 
 // Suites that read out/ (privacy scan over `out`, Electron E2E launching the app).
