@@ -248,6 +248,23 @@ test('English environment and settings views contain no Chinese UI copy and pres
   expect(await page.locator('body').innerText()).not.toMatch(/[\u4e00-\u9fff]/)
 })
 
+test('0.1.3 Tool Resolution panel renders the trusted resolver and leaks no diag.next keys', async () => {
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /\u73af\u5883$/ }).click()
+
+  // Trusted Tool Resolution panel (HUMAN-MAJOR-02): Node resolves via the
+  // fixture-provided node (AGENT_WORKBENCH_NODE_EXECUTABLE), not a PATH-only hit.
+  await expect(page.getByRole('heading', { name: '\u53ef\u4fe1\u5de5\u5177\u89e3\u6790' })).toBeVisible()
+  await expect(page.getByText('Node.js').first()).toBeVisible()
+  // npm is derived from the trusted Node, so it must also resolve.
+  await expect(page.getByText('npm').first()).toBeVisible()
+
+  // HUMAN-MAJOR-01: the remediation next-step box must never render raw keys.
+  const body = await page.locator('body').innerText()
+  expect(body).not.toContain('diag.next.title')
+  expect(body).not.toContain('diag.next.node')
+  expect(body).not.toMatch(/diag\.next\./)
+})
+
 test('API test connection rejects an invalid URL without external network', async () => {
   await openSettings()
   await switchToEnglish()

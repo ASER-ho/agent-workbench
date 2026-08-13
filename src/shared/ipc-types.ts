@@ -257,6 +257,12 @@ export const IPC_CHANNELS = {
   DIAGNOSTICS_RUN: 'diagnostics:run',
   DIAGNOSTICS_LAST_REPORT: 'diagnostics:get-last-report',
 
+  // Trusted Tool Resolution / overrides
+  TOOL_GET_RESOLUTION: 'tool:get-resolution',
+  TOOL_PICK: 'tool:pick',
+  TOOL_SET_OVERRIDE: 'tool:set-override',
+  TOOL_CLEAR_OVERRIDE: 'tool:clear-override',
+
   // Runtime Provider
   RUNTIME_SET_PROVIDER: 'runtime:set-provider',
   RUNTIME_CLEAR_PROVIDER: 'runtime:clear-provider',

@@ -83,16 +83,21 @@ test('external command discovery never interpolates discovered paths into a shel
   assert.equal(locateExecutable('bad&command').ok, false)
   assert.equal(readExecutableVersion('relative-tool.exe').ok, false)
 
-  for (const relativePath of [
-    ['src', 'main', 'ipc', 'maintenance.ts'],
-    ['src', 'main', 'services', 'diagnostics.ts']
-  ]) {
-    const source = readFileSync(join(process.cwd(), ...relativePath), 'utf8')
-    assert.doesNotMatch(source, /execSync/)
-    assert.doesNotMatch(source, /cmd\s+\/c/i)
-    assert.match(source, /locateExecutable\(/)
-    assert.match(source, /readExecutableVersion\(/)
-  }
+  // maintenance.ts still uses locateExecutable/readExecutableVersion safely.
+  const maintenance = readFileSync(join(process.cwd(), 'src', 'main', 'ipc', 'maintenance.ts'), 'utf8')
+  assert.doesNotMatch(maintenance, /execSync/)
+  assert.doesNotMatch(maintenance, /cmd\s+\/c/i)
+  assert.match(maintenance, /locateExecutable\(/)
+  assert.match(maintenance, /readExecutableVersion\(/)
+
+  // diagnostics.ts now resolves tools through the Trusted Tool Resolver, which
+  // is equally shell-safe (spawnSync, shell:false) and never interpolates a
+  // discovered path into a shell. No PATH-only locateExecutable remains.
+  const diagnostics = readFileSync(join(process.cwd(), 'src', 'main', 'services', 'diagnostics.ts'), 'utf8')
+  assert.doesNotMatch(diagnostics, /execSync/)
+  assert.doesNotMatch(diagnostics, /cmd\s+\/c/i)
+  assert.doesNotMatch(diagnostics, /locateExecutable\(/)
+  assert.match(diagnostics, /resolveNode|resolveClaude|resolveNpm/)
 })
 
 

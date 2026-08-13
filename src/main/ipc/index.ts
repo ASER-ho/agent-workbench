@@ -13,6 +13,7 @@ import { registerSessionHandlers } from './session'
 import { registerActionHandlers } from './action'
 import { registerVerificationHandlers } from './verification'
 import { registerControlledVerificationHandlers } from './controlled-verification'
+import { registerToolOverrideHandlers } from './tool-overrides'
 import { registerWorkspaceHandlers } from '../services/workspace-foundation/workspace-ipc'
 import { ClaudeProcessManager } from '../services/claude-process'
 import { FileSecretStore } from '../services/secret-store'
@@ -47,6 +48,7 @@ export function registerAllIpcHandlers(mainWindow: BrowserWindow): void {
   })
   registerVerificationHandlers()
   registerControlledVerificationHandlers()
+  registerToolOverrideHandlers(() => mainWindow)
   actionManager = registerActionHandlers(() => sessionManager.getSnapshot())
 
   // Passive observation: transcript polling + loopback hook server. Push events

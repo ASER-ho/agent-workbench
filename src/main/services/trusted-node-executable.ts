@@ -16,6 +16,7 @@ import { basename, isAbsolute, join, resolve } from 'node:path'
 
 import { canonicalStringify, sha256Utf8 } from '../utils/evidence-digest.ts'
 import { decodeWhereOutputCandidates } from './git-verification.ts'
+import { resolveNode } from './trusted-tool-resolver.ts'
 
 const NODE_IDENTITY_DIGEST_PREFIX = 'aw-node-identity-v1\0'
 const UNC_OR_DEVICE_RE = /^(?:\\\\|\\[?.]\\)/
@@ -98,27 +99,15 @@ export function resolveWhereNodeExecutable(): string | null {
 }
 
 /**
- * Production discovery chain for a trusted external node.exe:
- * 1. AGENT_WORKBENCH_NODE_EXECUTABLE (if set, still must pass validation)
- * 2. Standard install locations: %ProgramFiles%\nodejs\node.exe and
- *    %LOCALAPPDATA%\Programs\nodejs\node.exe
- * 3. trusted System32 where.exe node.exe
- * If none validate, returns an explicit failure.
+ * Production discovery chain for a trusted external node.exe. Delegates to the
+ * unified Trusted Tool Resolver so Environment Diagnostics and the Verification
+ * engine share one fact source (env -> user override -> standard locations ->
+ * where.exe). Each candidate must still pass `trustedNodeCandidate` validation.
  */
 export function resolveTrustedNodeExecutable(): TrustedNodeResult {
-  const candidates: string[] = []
-  const envNode = process.env['AGENT_WORKBENCH_NODE_EXECUTABLE']
-  if (envNode) candidates.push(envNode)
-  const programFiles = process.env['ProgramFiles']
-  const localAppData = process.env['LOCALAPPDATA']
-  if (programFiles) candidates.push(join(programFiles, 'nodejs', 'node.exe'))
-  if (localAppData) candidates.push(join(localAppData, 'Programs', 'nodejs', 'node.exe'))
-  const viaWhere = resolveWhereNodeExecutable()
-  if (viaWhere) candidates.push(viaWhere)
-  const result = resolveTrustedNodeFromCandidates(candidates)
-  if (result.trusted) return result
-  return {
-    trusted: false,
-    reason: 'No trusted external node.exe was found via AGENT_WORKBENCH_NODE_EXECUTABLE, standard install locations, or PATH'
+  const resolution = resolveNode()
+  if (resolution.found && resolution.executable) {
+    return { trusted: true, executable: resolution.executable, identityDigest: nodeIdentityDigest(resolution.executable) }
   }
+  return { trusted: false, reason: resolution.reason ?? 'No trusted external node.exe found' }
 }

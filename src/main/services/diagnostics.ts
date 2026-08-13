@@ -1,4 +1,5 @@
-import { locateExecutable, readExecutableVersion, registryValueExists } from '../utils/external-command'
+import { registryValueExists } from '../utils/external-command'
+import { resolveNode, resolveClaude, resolveNpm } from './trusted-tool-resolver'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import type { DiagnosticItem, DiagnosticReport } from '../../shared/ipc-types'
@@ -36,15 +37,15 @@ export class DiagnosticsService {
     const workspaceRoot = getWorkspaceRoot()
     const projectDir = getProjectRoot()
 
-    const node = locateExecutable('node')
-    const nodePath = node.ok ? node.val.split(/\r?\n/)[0] : ''
-    const nodeV = nodePath ? readExecutableVersion(nodePath) : { ok: false, val: '' }
-    const npm = locateExecutable('npm')
-    const npmPath = npm.ok ? npm.val.split(/\r?\n/)[0] : ''
-    const npmV = npmPath ? readExecutableVersion(npmPath) : { ok: false, val: '' }
-    const claude = locateExecutable('claude')
-    const claudePath = claude.ok ? claude.val.split(/\r?\n/)[0] : ''
-    const claudeV = claudePath ? readExecutableVersion(claudePath) : { ok: false, val: '' }
+    const nodeRes = resolveNode()
+    const nodePath = nodeRes.found ? nodeRes.executable! : ''
+    const nodeV = nodeRes.version
+    const npmRes = resolveNpm(nodeRes.found ? nodeRes.executable : null)
+    const npmPath = npmRes.found ? npmRes.executable! : ''
+    const npmV = npmRes.version
+    const claudeRes = resolveClaude()
+    const claudePath = claudeRes.found ? claudeRes.executable! : ''
+    const claudeV = claudeRes.version
 
     const envKeys = ['ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const
     let settings: Record<string, unknown> | null = null
@@ -54,14 +55,14 @@ export class DiagnosticsService {
     const l = !!(cfg as Record<string, unknown> | null)?.['apiKey']; const r = !!(cfg as Record<string, unknown> | null)?.['apiKeyRef']
 
     const items: DiagnosticItem[] = [
-      this.item('node-path', 'Node.js in PATH', node.ok ? 'ok' : 'error', node.ok ? node.val : '不在 PATH 中'),
-      this.item('node-version', 'Node.js 版本', nodeV.ok ? 'ok' : 'error', nodeV.ok ? nodeV.val : '无法获取'),
+      this.item('node-path', 'Node.js in PATH', nodeRes.found ? 'ok' : 'error', nodeRes.found ? nodePath : '不在 PATH 中'),
+      this.item('node-version', 'Node.js 版本', nodeV ? 'ok' : 'error', nodeV ?? '无法获取'),
 
-      this.item('npm-path', 'npm in PATH', npm.ok ? 'ok' : 'error', npm.ok ? npm.val : '不在 PATH 中'),
-      this.item('npm-version', 'npm 版本', npmV.ok ? 'ok' : 'error', npmV.ok ? npmV.val : '无法获取'),
+      this.item('npm-path', 'npm in PATH', npmRes.found ? 'ok' : 'error', npmRes.found ? npmPath : '不在 PATH 中'),
+      this.item('npm-version', 'npm 版本', npmV ? 'ok' : 'error', npmV ?? '无法获取'),
 
-      this.item('claude-path', 'Claude CLI in PATH', claude.ok ? 'ok' : 'error', claude.ok ? claude.val : '未安装 Claude CLI'),
-      this.item('claude-version', 'Claude CLI 版本', claudeV.ok ? 'ok' : 'error', claudeV.ok ? claudeV.val : '无法获取版本'),
+      this.item('claude-path', 'Claude CLI in PATH', claudeRes.found ? 'ok' : 'error', claudeRes.found ? claudePath : '未安装 Claude CLI'),
+      this.item('claude-version', 'Claude CLI 版本', claudeV ? 'ok' : 'error', claudeV ?? '无法获取版本'),
 
       ...envKeys.map(k => this.item('env-' + k.toLowerCase(), '环境变量: ' + k, process.env[k] ? 'warn' : 'ok',
         process.env[k] ? '存在 (敏感值已隐藏)' : '不存在', { sensitive: true })),

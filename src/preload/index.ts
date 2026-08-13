@@ -121,6 +121,12 @@ export interface AgentWorkbenchApi {
     }>
     rollback: (snapshotName: string) => Promise<{ success: boolean; restoredFrom?: string; message?: string }>
   }
+  tools: {
+    getResolution: () => Promise<Record<string, unknown>>
+    pick: (kind: 'node' | 'claude') => Promise<string | null>
+    setOverride: (kind: 'node' | 'claude', path: string) => Promise<{ ok: boolean; error?: string }>
+    clearOverride: (kind: 'node' | 'claude') => Promise<{ ok: boolean; error?: string }>
+  }
   package: {
     createShareZip: () => Promise<{
       success: boolean
@@ -258,6 +264,12 @@ const api: AgentWorkbenchApi = {
     resetSafeMode: () => ipcRenderer.invoke(IPC_CHANNELS.MODEL_RESET_SAFE_MODE),
     listSnapshots: () => ipcRenderer.invoke(IPC_CHANNELS.MODEL_LIST_SNAPSHOTS),
     rollback: (snapshotName) => ipcRenderer.invoke(IPC_CHANNELS.MODEL_ROLLBACK, { snapshotName })
+  },
+  tools: {
+    getResolution: () => ipcRenderer.invoke(IPC_CHANNELS.TOOL_GET_RESOLUTION),
+    pick: (kind) => ipcRenderer.invoke(IPC_CHANNELS.TOOL_PICK, kind),
+    setOverride: (kind, path) => ipcRenderer.invoke(IPC_CHANNELS.TOOL_SET_OVERRIDE, { kind, path }),
+    clearOverride: (kind) => ipcRenderer.invoke(IPC_CHANNELS.TOOL_CLEAR_OVERRIDE, kind)
   },
   package: {
     createShareZip: () => ipcRenderer.invoke(IPC_CHANNELS.PACKAGE_SHARE),
