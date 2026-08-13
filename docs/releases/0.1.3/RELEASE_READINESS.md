@@ -13,6 +13,8 @@ AW_0_1_3_RC_ARTIFACT_READY_FOR_USER_VALIDATION
 AW_0_1_3_RELEASE_EVIDENCE_REFRESHED
 AW_0_1_3_ARTIFACT_SOURCE_D1C49E8_PRESERVED
 AW_0_1_3_FINAL_EVIDENCE_HEAD_RECORDED
+AW_0_1_3_FINAL_HUMAN_VALIDATION_PASS
+AW_0_1_3_RELEASE_CANDIDATE_ACCEPTED
 AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 ```
 
@@ -156,6 +158,24 @@ Re-verification: unit battery 23/23 (incl. new `test:tools` + static tool-resolu
 - Observation supports Claude Code Hooks/transcripts and Codex transcripts only.
 - No automatic updates, cloud sync, persistent/multi-use authorization, history UI, Agent launch, provider control, or general terminal are included.
 
+## Final human validation
+
+The user accepted the `C6553933…` RC after independent SHA-256 verification and
+the 6-item manual validation (install, Environment/`diag.next.*` absence, Path
+Editor typing, submit/return normalization, real Node test run, restart
+persistence).
+
+```text
+AW_0_1_3_FINAL_HUMAN_VALIDATION_PASS
+AW_0_1_3_RELEASE_CANDIDATE_ACCEPTED
+BLOCKER = 0
+MAJOR   = 0
+MINOR   = 1 ACCEPTED
+  RAW_IPC_ERROR_EXPOSED_TO_UI   (deferred to the future AwErrorCode stage)
+```
+
+The accepted MINOR does not block 0.1.3 and does not require a rebuild.
+
 ## Publication boundary
 
-No push, tag, pull request, GitHub Release, repository-setting change, package publication, or other remote mutation was performed. The local RC is ready for user validation and stops immediately before any push decision.
+No push, tag, pull request, GitHub Release, repository-setting change, package publication, or other remote mutation was performed. The RC is accepted; any push/tag/release requires separate explicit authorization.
