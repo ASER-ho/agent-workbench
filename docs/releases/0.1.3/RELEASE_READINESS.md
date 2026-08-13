@@ -176,6 +176,19 @@ MINOR   = 1 ACCEPTED
 
 The accepted MINOR does not block 0.1.3 and does not require a rebuild.
 
-## Publication boundary
+## Publication record
 
-No push, tag, pull request, GitHub Release, repository-setting change, package publication, or other remote mutation was performed. The RC is accepted; any push/tag/release requires separate explicit authorization.
+The user authorized publication explicitly after RC acceptance.
+
+```text
+feat/0.1.3-trusted-observation  pushed to origin (HEAD 20b5ede)
+main                            ff-merged to 20b5ede and pushed (22f0f66..20b5ede)
+tag v0.1.3                      created and pushed (→ 20b5ede)
+GitHub Release v0.1.3           created (Prerelease)
+  https://github.com/ASER-ho/agent-workbench/releases/tag/v0.1.3
+  assets: C6553933 installer, blockmap, app.asar, SHA256SUMS-0.1.3.txt
+  GitHub-computed digests match the local SHA256SUMS
+```
+
+Pre-publication state (for reference): no push/tag/release was performed until the
+user explicitly authorized each step.
