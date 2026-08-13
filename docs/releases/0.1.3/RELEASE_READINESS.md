@@ -8,6 +8,7 @@ AW_0_1_3_TRUSTED_OBSERVATION_PASS
 AW_0_1_3_AUTO_VERIFY_AUTHORIZATION_PASS
 AW_0_1_3_OBSERVATION_PRIVACY_PASS
 AW_0_1_3_LOCAL_E2E_PASS
+AW_0_1_3_HUMAN_SMOKE_FIXES_PASS
 AW_0_1_3_RC_ARTIFACT_READY_FOR_USER_VALIDATION
 AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 ```
@@ -20,8 +21,8 @@ AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 | Current rewritten baseline | `22f0f666a9591f9d1a49959232fbf45d1d055491` |
 | Baseline relationship | different commit histories, identical tree `c52fbd6fd274182f1c5d942ce71121ef10e8ca0d` |
 | Branch | `feat/0.1.3-trusted-observation` |
-| Artifact source commit | `897cdb91adcf8497fe21436d9f64f8fd5efe8536` |
-| Artifact source tree | `01208b098c056a84e8c21a46d17410a43fcc8d2b` |
+| Artifact source commit | `6b2564c` (Human RC smoke fix) |
+| Previous artifact (superseded) | `E211D522B9C373F5DE140D7C96B3CA5707074125492D4FB9F14E94FEC4851B96` |
 
 The release-evidence commit containing this file is intentionally newer than the artifact source commit. No product, build configuration, or smoke-test code changed after the artifact source commit.
 
@@ -52,7 +53,7 @@ The release-evidence commit containing this file is intentionally newer than the
 | --- | --- |
 | `npm run build` | PASS; main 61 modules, preload 2 modules, renderer 77 modules |
 | `npm test -- --exclude test:electron` | PASS; all 22 suites; Observation 49/49 |
-| `npm run test:electron` | PASS; 63/63 in 3.2 minutes, including Observation 4/4 |
+| `npm run test:electron` | PASS; 64/64 in ~3.4 minutes (incl. Tool Resolution panel E2E) |
 | `npm run pack -- --config.electronDist=node_modules/electron/dist` | PASS; Windows x64 unpacked application |
 | `npm run dist -- --config.electronDist=node_modules/electron/dist` | PASS; NSIS installer and blockmap |
 
@@ -83,9 +84,22 @@ Output directory: local ignored `dist/`.
 
 | File | Size | SHA-256 | Authenticode |
 | --- | ---: | --- | --- |
-| `Agent Workbench Setup 0.1.3.exe` | 95,911,258 B | `E211D522B9C373F5DE140D7C96B3CA5707074125492D4FB9F14E94FEC4851B96` | `NotSigned` |
-| `Agent Workbench Setup 0.1.3.exe.blockmap` | 101,241 B | `ECE7FD72BD44173ADF84E7A2A634347154F42FB1073AD81DF44DC7438E065433` | not applicable |
-| `win-unpacked/Agent Workbench.exe` | 232,546,816 B | `D6B5DB6CE86EA866F02676021376B68619B031288DFE3061C459C4C8BC2A3FF5` | `NotSigned` |
+| `Agent Workbench Setup 0.1.3.exe` | 95,828,658 B | `90258B2622F6AA635977F683FFD95F36CA9126FC8F2428327E8971368D1FF880` | `NotSigned` |
+| `Agent Workbench Setup 0.1.3.exe.blockmap` | — | `AFB737C13A3A36E8E8938B16221D1CDA0BAE88FC48CD74AE5955C01231D95E44` | not applicable |
+| `win-unpacked/Agent Workbench.exe` | 232,546,816 B | `43E362796126C64424D8BB77F196AAE9286EB88DE4C86561F9865CEDEE97FB8A` | `NotSigned` |
+| `win-unpacked/resources/app.asar` | — | `621C1F9D6485A08A5548E4128B2BFBF5F1D587150B230BF0C5BC8D4DC49B3FE9` | not applicable |
+
+## Human RC smoke fix (0.1.3)
+
+The user's Human RC smoke on the previous artifact found three issues; all are fixed and re-verified in this artifact.
+
+| Finding | Fix |
+| --- | --- |
+| HUMAN-MINOR-01 — stale `0.1.2-B` Inspector placeholder | Replaced `inspector.*Hint` strings with current product copy (zh/en). |
+| HUMAN-MAJOR-01 — `diag.next.*` raw key leak | Keys existed only in unused locale JSON files; added them to `LocaleContext` `LOCALE_DATA` so `t()` resolves them. Static regression test asserts both zh/en blocks carry all six keys. |
+| HUMAN-MAJOR-02 — tool discovery false negative | New unified `Trusted Tool Resolver` (`trusted-tool-resolver.ts`): Environment Diagnostics and the Verification engine now share one fact source. node/claude resolve via env → user override → standard locations → `where.exe`; npm derives from the trusted Node. Manual `node.exe`/`claude.exe` selection via a native file dialog (display-safe confirmation; full path never crosses IPC), persisted to userData. Real-machine validation found the user's `C:\Claude` node `v22.14.0`, npm `10.9.2`, Claude CLI `2.1.220` after override. |
+
+Re-verification: unit battery 23/23 (incl. new `test:tools` + static tool-resolution scan); Electron E2E 64/64; packaged smoke PASS (shell + Tool Resolution panel + no raw-key leak, 0 residual processes).
 
 ## Security invariants confirmed
 
