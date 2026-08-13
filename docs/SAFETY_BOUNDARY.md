@@ -15,6 +15,10 @@ This document describes the current Alpha boundary. It does not claim roadmap co
 - Credentials, SecretStore values, and full sensitive local paths must not appear in normal UI, copied reports, or public release evidence.
 - Registry diagnostics are read-only.
 - Non app-managed files must not be deleted by cleanup or uninstall flows.
+- Observation is off by default. Renderer projections exclude raw transcript content, full cwd, transcript paths, source PID, and Hook secrets.
+- Hook marker presence is not health; installed entries must match the active loopback endpoint. Repair requires preview and confirmation.
+- Automatic verification requires a Main-owned, single-use workspace/contract/recipe/trigger authorization consumed before execution.
+- Critical authorization audit failure prevents unattended automatic execution.
 
 ## Future Real Agent Launch
 

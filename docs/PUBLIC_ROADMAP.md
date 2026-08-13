@@ -1,38 +1,38 @@
 # Public Roadmap
 
-Agent Workbench is a Windows-first desktop workbench for safe, visible, user-controlled AI coding-agent workflows.
+Agent Workbench is a Windows-first, local-first, agent-neutral verification workbench.
 
-## Current Alpha
+## Current 0.1.3 Release Candidate
 
-- Desktop settings, diagnostics, readiness, project capsule, and package/share surfaces.
-- Display-safe path and credential handling.
-- Deterministic stub Session lifecycle.
-- Controlled action proposals, approvals, execution, and receipts.
-- Managed-snapshot-only model rollback.
-- Browser smoke and real Electron E2E coverage.
-- Real external Agent launch remains disabled as a default release path.
+- Trusted opt-in Observation for Claude Code and Codex.
+- Display-safe event projection and privacy regression coverage.
+- Hook endpoint health, drift detection, previewed repair, and precise uninstall.
+- Single-use workspace/contract/recipe-bound Auto Verification.
+- Consume-before-execute duplicate protection and minimized authorization audit.
+- Deterministic controlled verification, evidence, Receipt, and Handoff.
+- Local Electron E2E gate and packaged smoke.
 
-## Next Product Line
+## Next
 
-- Guided first launch.
-- User-selected workspace history and clearer workspace state.
-- Provider setup and provider transparency.
-- User-confirmed real Agent launch with status and safe error explanations.
-- Safe share packages and redaction reports.
-- Storage cleanup preview and app-managed resource ledger.
-- Package cancellation, timeout, retry, and size breakdown.
-- Provider-neutral profiles and stronger environment isolation.
+- Contract and baseline lifecycle.
+- Evidence relations and independence.
+- Verification history and result comparison.
+- Bounded Action Queue.
+- Production worksurface, diagnostics, and Safe Share improvements.
 
 ## Later
 
-- Multi-Agent session governance.
-- Richer terminal, diff, receipt, and handoff views.
-- Professional repository and runtime safety checks.
-- Team templates and workflow observability.
-- Optional CI and cloud features only when justified by real team use.
+- Additional Agent adapters after observation/verification contracts stabilize.
+- Human Acceptance and overrides separated from `VERIFIED`.
+- Large-evidence and large-change workflows.
+- Optional CI evidence import after provenance boundaries are specified.
 
-## Explicitly Out of Scope
+## Explicitly not near-term
 
-- Default or silent real Agent launch.
-- Claims that roadmap features are already implemented.
-- Publication of private notes, machine-specific paths, credentials, or invalidated release evidence.
+- Provider Center/profiles.
+- Real Agent launch.
+- Rich general terminal.
+- Multi-agent orchestration/governance.
+- Multi-workspace or cloud Agent platform features.
+
+Roadmap items are not implemented capabilities. Current claims require code plus fresh verification evidence.

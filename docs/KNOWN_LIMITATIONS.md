@@ -1,32 +1,33 @@
 # Known Limitations
 
-The following limitations apply to Agent Workbench `0.1.0-alpha.1` built from commit `2658c0e481c6fc5693aad31302058f5d8b2c86d6`.
+These limitations describe Agent Workbench 0.1.3 Release Candidate capabilities, not roadmap promises.
 
-## Platform and Distribution
+## Platform and distribution
 
-- The reviewed release target is Windows x64. Other operating systems and architectures are not release-qualified.
-- The Alpha installer is not code-signed. Windows may display unknown-publisher or reputation warnings.
-- The npm package metadata does not yet declare an author field; the MIT notice identifies Agent Workbench contributors as the copyright holder.
-- Automatic update delivery is not included. Install upgrades manually after verifying the new release checksum.
-- Migration from older private application identities and user-data directories is not automated.
+- Windows x64 is the only release-qualified target.
+- The installer is unsigned and can trigger unknown-publisher or SmartScreen warnings.
+- Electron E2E and packaged smoke are local release gates; GitHub CI cannot substitute.
+- Automatic updates are not included.
 
-## Agent Runtime
+## Verification and evidence
 
-- Real external Agent launch is not enabled as the default release path.
-- The reviewed Session flow uses a deterministic local stub to validate confirmation, input, stop, crash, timeout, and cleanup behavior.
-- Complete process or container isolation for future external Agent runtimes is not claimed.
-- Provider-neutral profiles and broader provider lifecycle management are incomplete.
+- Verification is `PROCESS_BOUNDARY_ONLY`; there is no filesystem sandbox, container, or VM boundary.
+- Network access is not technically denied by the verification process boundary.
+- The current criterion backend and recipe registry are fixed in code.
+- `VERIFIED` is not human acceptance; acceptance remains `NOT_RECORDED`.
+- The local audit is append-only by application behavior, not cryptographically tamper-proof.
 
-## Diagnostics and Packaging
+## Observation and authorization
 
-- Diagnostics are best-effort and may report a version as unavailable when a discovered Windows tool is exposed only through a `.cmd` or `.bat` shim. The application intentionally does not execute those shims through `cmd.exe` during version detection.
-- The share/package flow is local and does not publish artifacts automatically.
-- The current release has no automatic crash reporting or telemetry upload.
+- Observation supports Claude Code Hooks/transcripts and Codex transcripts only.
+- Observation is off by default.
+- Auto Verification uses an in-memory, single-use lease bound to one workspace, remembered contract, exact recipe set, and `session:end`.
+- Authorization is intentionally not persisted across app lifecycle.
+- Hook repair requires preview and confirmation; no silent Claude settings rewrite.
 
-## Alpha Expectations
+## Product boundary
 
-- Back up important workspaces before testing an Alpha build.
-- Treat generated receipts and diagnostics as local evidence, not as a complete security audit of external tools.
-- Verify installer SHA-256 values before every installation.
+- No real external Agent launch, provider/model management, general terminal, multi-workspace operation, or cloud sync.
+- No signing/Sigstore, sandbox/container verification, CI evidence import, verification history, activity timeline, action queue, Agent Claim, or Human Acceptance surface.
 
-See the [Safety Boundary](SAFETY_BOUNDARY.md) and [Public Roadmap](PUBLIC_ROADMAP.md) for current guarantees and planned work.
+See [Safety Boundary](SAFETY_BOUNDARY.md), [Auto-Verification Security Model](AUTO_VERIFICATION_SECURITY_MODEL.md), and [Public Roadmap](PUBLIC_ROADMAP.md).

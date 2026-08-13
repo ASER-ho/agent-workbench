@@ -30,6 +30,8 @@ test-results/
 playwright-report/
 blob-report/
 .stage-d-*/
+.planning/
+*.tsbuildinfo
 
 # ─── Transaction data ───
 *.jsonl
