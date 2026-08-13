@@ -10,6 +10,9 @@ AW_0_1_3_OBSERVATION_PRIVACY_PASS
 AW_0_1_3_LOCAL_E2E_PASS
 AW_0_1_3_HUMAN_SMOKE_FIXES_PASS
 AW_0_1_3_RC_ARTIFACT_READY_FOR_USER_VALIDATION
+AW_0_1_3_RELEASE_EVIDENCE_REFRESHED
+AW_0_1_3_ARTIFACT_SOURCE_D1C49E8_PRESERVED
+AW_0_1_3_FINAL_EVIDENCE_HEAD_RECORDED
 AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 ```
 
@@ -21,9 +24,11 @@ AW_0_1_3_GITHUB_MUTATION_NOT_PERFORMED
 | Current rewritten baseline | `22f0f666a9591f9d1a49959232fbf45d1d055491` |
 | Baseline relationship | different commit histories, identical tree `c52fbd6fd274182f1c5d942ce71121ef10e8ca0d` |
 | Branch | `feat/0.1.3-trusted-observation` |
-| Artifact source commit | `6b2564c` (Human RC smoke fix) — full SHA `6b2564caec6bbd7ba39a6a182c0ba734aa3e98a5` |
-| Final evidence HEAD | `b41619f` (docs only; no product/build/smoke change after the artifact source commit) |
+| Artifact source commit | `d1c49e8` (PATH_LIST_EDITOR fix) — full SHA `d1c49e8…` (recorded in Final artifact identity) |
+| Artifact source tree | `30e7f3b75a3aaa4a0cf476fa9af3e5ecded3dd2d` |
+| Final evidence HEAD | (docs-only commit; recorded after the evidence commit is created) |
 | Previous artifact (superseded) | `E211D522B9C373F5DE140D7C96B3CA5707074125492D4FB9F14E94FEC4851B96` |
+| Previous artifact (superseded) | `90258B2622F6AA635977F683FFD95F36CA9126FC8F2428327E8971368D1FF880` |
 
 The release-evidence commit containing this file is intentionally newer than the artifact source commit. No product, build configuration, or smoke-test code changed after the artifact source commit.
 
@@ -79,16 +84,40 @@ packed-app-smoke=PASS
 
 The smoke used an isolated temporary workspace and did not launch a real Agent or read SecretStore content.
 
+## Final artifact identity (d1c49e8 RC)
+
+```text
+ARTIFACT_SOURCE_COMMIT     d1c49e8  (PATH_LIST_EDITOR fix)
+ARTIFACT_SOURCE_TREE       30e7f3b75a3aaa4a0cf476fa9af3e5ecded3dd2d
+FINAL_RC_ARTIFACT_PATH     F:\GW\AgentWorkbench\dist\Agent Workbench Setup 0.1.3.exe
+FINAL_RC_ARTIFACT_SIZE     95,828,490 B
+AUTHENTICODE_STATUS        NotSigned
+```
+
+Artifact source evidence: the installer was built at 2026-08-13 17:40, after the
+`d1c49e8` commit (17:37) and before any later product commit; the working tree was
+clean at build time. **A docs-only evidence commit is not the artifact source
+commit** — `d1c49e8` remains the artifact source, and the Final Evidence HEAD is
+recorded separately below.
+
 ## Artifacts
 
 Output directory: local ignored `dist/`.
 
+The current and only final 0.1.3 RC installer is **`C6553933…`**. Earlier
+artifacts are superseded and must not be uploaded or treated as current:
+
+| Artifact | Status |
+| --- | --- |
+| `E211D522…B1E96` installer | SUPERSEDED |
+| `90258B26…1FF880` installer | SUPERSEDED |
+
 | File | Size | SHA-256 | Authenticode |
 | --- | ---: | --- | --- |
-| `Agent Workbench Setup 0.1.3.exe` | 95,828,658 B | `90258B2622F6AA635977F683FFD95F36CA9126FC8F2428327E8971368D1FF880` | `NotSigned` |
-| `Agent Workbench Setup 0.1.3.exe.blockmap` | — | `AFB737C13A3A36E8E8938B16221D1CDA0BAE88FC48CD74AE5955C01231D95E44` | not applicable |
+| `Agent Workbench Setup 0.1.3.exe` | 95,828,490 B | `C6553933A0D717926EEB170C6B1A668D4343C7BAA96C788DE7E039C799BEA1DE` | `NotSigned` |
+| `Agent Workbench Setup 0.1.3.exe.blockmap` | — | `C54A8769F3EF12F61B13A802DEBE6B702EBC6D0B047688A0B94964B6C29250FB` | not applicable |
 | `win-unpacked/Agent Workbench.exe` | 232,546,816 B | `43E362796126C64424D8BB77F196AAE9286EB88DE4C86561F9865CEDEE97FB8A` | `NotSigned` |
-| `win-unpacked/resources/app.asar` | — | `621C1F9D6485A08A5548E4128B2BFBF5F1D587150B230BF0C5BC8D4DC49B3FE9` | not applicable |
+| `win-unpacked/resources/app.asar` | — | `52E0116B2EACDD437281F1ABD65B2F23D16BC3FED3113C146B3B0978D9C736D4` | not applicable |
 
 ## Human RC smoke fix (0.1.3)
 
